@@ -70,25 +70,26 @@ async function fetchWorkflowConfig(): Promise<WorkflowConfig | null> {
 
 /**
  * Generic Git Tag Checker Factory
+ * @param regexFactory A function that returns a RegExp given a context string
  */
-const createGitTagChecker = (repo: string) => async (major: string, lastVersion: string) => {
-  try {
-    const response = await fetch(`https://api.github.com/repos/${repo}/tags`);
-    const tags = await response.json();
-    
-    const majorStr = `${major[0]}.${parseInt(major.slice(1))}`;
-    const tagRegex = new RegExp(`^v${majorStr.replace('.', '\\.')}\\.\\d+`);
-    const latest = tags.find((t: any) => tagRegex.test(t.name))?.name;
+const createGitTagChecker = (repo: string, regexFactory: (ctx: string) => RegExp) => 
+  async (context: string, lastVersion: string) => {
+    try {
+      const response = await fetch(`https://api.github.com/repos/${repo}/tags`);
+      const tags = await response.json();
+      
+      const tagRegex = regexFactory(context);
+      const latest = tags.find((t: any) => tagRegex.test(t.name))?.name;
 
-    if (latest && latest !== lastVersion) {
-      console.log(`NEW ${repo} VERSION: ${latest} (was ${lastVersion})`);
-      return { detected: true, latest };
+      if (latest && latest !== lastVersion) {
+        console.log(`NEW ${repo} VERSION: ${latest} (was ${lastVersion})`);
+        return { detected: true, latest };
+      }
+    } catch (e) {
+      console.error(`Git tag check failed for ${repo}:`, e);
     }
-  } catch (e) {
-    console.error(`Git tag check failed for ${repo}:`, e);
-  }
-  return { detected: false };
-};
+    return { detected: false };
+  };
 
 /**
  * Generic Docker Digest Checker Factory
@@ -116,13 +117,18 @@ const createDockerDigestChecker = (repository: string) => async (tags: string[],
 };
 
 // Specialized Checkers
-const checkMoodleUpdate = createGitTagChecker(MOODLE_UPSTREAM);
+// Moodle logic: major 501 -> v5.1.*
+const checkMoodleUpdate = createGitTagChecker(MOODLE_UPSTREAM, (major) => {
+  const majorStr = `${major[0]}.${parseInt(major.slice(1))}`;
+  return new RegExp(`^v${majorStr.replace('.', '\\.')}\\.\\d+`);
+});
+
 const checkPhpUpdates = createDockerDigestChecker("library/php");
 
 /**
  * 4. Trigger GitHub Repository Dispatch
  */
-async function triggerDispatch(moodleVersion: string): Promise<boolean> {
+async function triggerDispatch(payload: object): Promise<boolean> {
   console.log("Triggering GitHub workflow...");
   try {
     const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/dispatches`, {
@@ -134,7 +140,7 @@ async function triggerDispatch(moodleVersion: string): Promise<boolean> {
       },
       body: JSON.stringify({
         event_type: "upstream_update",
-        client_payload: { moodle_version: moodleVersion },
+        client_payload: payload,
       }),
     });
     return res.ok;
@@ -153,7 +159,7 @@ async function checkUpdates(state: State): Promise<State> {
     triggerReason: ""
   };
 
-  // 0. Initial Webhook Check (Synchronous)
+  // 0. Initial Webhook Check
   const webhook = checkWebhookTrigger(state);
   if (webhook.detected) {
     context.newState.lastRepoTag = webhook.newTag;
@@ -182,7 +188,12 @@ async function checkUpdates(state: State): Promise<State> {
       }
 
       if (context.triggerReason) {
-        return triggerDispatch(context.newState.lastMoodleVersion).then(success => {
+        const payload = {
+          reason: `Upstream update detected (Trigger: ${context.triggerReason})`,
+          moodle_version: context.newState.lastMoodleVersion,
+          repo_tag: context.newState.lastRepoTag
+        };
+        return triggerDispatch(payload).then(success => {
           if (success) console.log(`Build triggered successfully (Reason: ${context.triggerReason})`);
           return context.newState;
         });
