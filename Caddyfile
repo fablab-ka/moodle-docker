@@ -1,0 +1,33 @@
+:80 {
+    root * /var/www/html/public
+    
+    # Moodle 5.1 Routing: try files, then fallback to r.php
+    php_fastcgi app:9000 {
+        try_files {path} {path}/ /r.php?{query}
+    }
+
+    file_server
+
+    # Security Headers
+    header {
+        Strict-Transport-Security "max-age=31536000;"
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        Referrer-Policy strict-origin-when-cross-origin
+    }
+
+    # Logging
+    log {
+        output stdout
+    }
+
+    # With the new /public root, most sensitive files (config.php, vendor, .git)
+    # are already physically inaccessible as they live in /var/www/html (above root).
+    # We still hide some potential public-folder noise.
+    @hidden {
+        path /error_log
+        path /.DS_Store
+        path /Thumbs.db
+    }
+    error @hidden 404
+}

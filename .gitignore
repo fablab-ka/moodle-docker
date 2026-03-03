@@ -1,0 +1,8 @@
+.env
+.env.local
+.DS_Store
+*.log
+docker-compose.override.yml
+/moodledata/
+/moodle/
+/db/

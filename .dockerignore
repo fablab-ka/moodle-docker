@@ -1,0 +1,11 @@
+.git
+.gitignore
+.env
+.env.*
+README.md
+Dockerfile
+docker-compose.yml
+Caddyfile
+node_modules
+vendor
+EOF

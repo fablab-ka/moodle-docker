@@ -1,0 +1,79 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: always
+    environment:
+      POSTGRES_DB: ${MOODLE_DB_NAME:-moodle}
+      POSTGRES_USER: ${MOODLE_DB_USER:-moodle}
+      POSTGRES_PASSWORD: ${MOODLE_DB_PASS:-moodle}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  app:
+    build:
+      context: .
+      args:
+        PHP_VERSION: ${PHP_VERSION:-8.4}
+        MOODLE_VERSION: ${MOODLE_VERSION:-5.1.3}
+        MOODLE_MAJOR_VERSION: ${MOODLE_MAJOR_VERSION:-501}
+    restart: always
+    environment:
+      MOODLE_DB_TYPE: pgsql
+      MOODLE_DB_HOST: db
+      MOODLE_DB_NAME: ${MOODLE_DB_NAME:-moodle}
+      MOODLE_DB_USER: ${MOODLE_DB_USER:-moodle}
+      MOODLE_DB_PASS: ${MOODLE_DB_PASS:-moodle}
+      MOODLE_DB_PORT: 5432
+      MOODLE_URL: ${MOODLE_URL:-http://localhost}
+      MOODLE_REVERSE_PROXY: ${MOODLE_REVERSE_PROXY:-false}
+      MOODLE_SSL_PROXY: ${MOODLE_SSL_PROXY:-false}
+      MOODLE_AUTO_UPGRADE: ${MOODLE_AUTO_UPGRADE:-false}
+      MOODLE_ADMIN_USER: ${MOODLE_ADMIN_USER}
+      MOODLE_ADMIN_PASS: ${MOODLE_ADMIN_PASS}
+      MOODLE_ADMIN_EMAIL: ${MOODLE_ADMIN_EMAIL}
+      MOODLE_SITE_FULLNAME: ${MOODLE_SITE_FULLNAME:-Moodle Site}
+      MOODLE_SITE_SHORTNAME: ${MOODLE_SITE_SHORTNAME:-Moodle}
+    volumes:
+      - moodle_code:/var/www/html
+      - moodle_data:/var/www/moodledata
+    depends_on:
+      - db
+
+  cron:
+    image: moodle-app # Will be built by 'app'
+    build:
+      context: .
+    restart: always
+    command: ["cron"]
+    environment:
+      MOODLE_DB_TYPE: pgsql
+      MOODLE_DB_HOST: db
+      MOODLE_DB_NAME: ${MOODLE_DB_NAME:-moodle}
+      MOODLE_DB_USER: ${MOODLE_DB_USER:-moodle}
+      MOODLE_DB_PASS: ${MOODLE_DB_PASS:-moodle}
+      MOODLE_DB_PORT: 5432
+      MOODLE_URL: ${MOODLE_URL:-http://localhost}
+      MOODLE_CRON_COUNT: ${MOODLE_CRON_COUNT:-1}
+      MOODLE_ADHOC_TASK_COUNT: ${MOODLE_ADHOC_TASK_COUNT:-0}
+    volumes:
+      - moodle_code:/var/www/html
+      - moodle_data:/var/www/moodledata
+    depends_on:
+      - db
+      - app
+
+  web:
+    image: caddy:2-alpine
+    restart: always
+    ports:
+      - "8080:80"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - moodle_code:/var/www/html
+    depends_on:
+      - app
+
+volumes:
+  db_data:
+  moodle_code:
+  moodle_data:

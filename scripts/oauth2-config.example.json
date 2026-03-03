@@ -1,0 +1,16 @@
+{
+  "name": "My Enterprise IDP",
+  "baseurl": "https://idp.example.com",
+  "clientid": "your-client-id",
+  "clientsecret": "your-client-secret",
+  "loginscopes": "openid profile email",
+  "loginscopesoffline": "openid profile email offline_access",
+  "showonloginpage": 1,
+  "enabled": 1,
+  "field_mappings": {
+    "sub": "username",
+    "given_name": "firstname",
+    "family_name": "lastname",
+    "email": "email"
+  }
+}
