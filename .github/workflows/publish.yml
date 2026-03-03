@@ -11,10 +11,19 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  MOODLE_VERSION: 5.1.3
+  MOODLE_MAJOR: 501
+  PHP_LTS: 8.2
+  PHP_LATEST: 8.4
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php_version: ['8.2', '8.3', '8.4']
+    
     permissions:
       contents: read
       packages: write
@@ -33,16 +42,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=sha
+            # Primary versioned tag (e.g., 501-php8.4)
+            type=raw,value=${{ env.MOODLE_MAJOR }}-php${{ matrix.php_version }}
+            
+            # Major version tag (e.g., 501) points to LTS PHP (8.2)
+            type=raw,value=${{ env.MOODLE_MAJOR }},enable=${{ matrix.php_version == env.PHP_LTS }}
+            
+            # 'latest' tag points to newest major (501) and latest PHP (8.4)
+            type=raw,value=latest,enable=${{ matrix.php_version == env.PHP_LATEST }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -54,6 +67,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
-            PHP_VERSION=8.4
-            MOODLE_VERSION=5.1.3
-            MOODLE_MAJOR_VERSION=501
+            PHP_VERSION=${{ matrix.php_version }}
+            MOODLE_VERSION=${{ env.MOODLE_VERSION }}
+            MOODLE_MAJOR_VERSION=${{ env.MOODLE_MAJOR }}

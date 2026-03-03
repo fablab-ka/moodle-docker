@@ -77,9 +77,15 @@ To use the published image instead of building it locally, update your `docker-c
 ```yaml
 services:
   app:
-    image: ghcr.io/your-username/moodle-docker:main
+    image: ghcr.io/your-username/moodle-docker:latest
     # remove the 'build:' section
 ```
+
+#### Available Tags
+The image is published with the following tagging strategy:
+- **`latest`**: Points to the most recent Moodle version on the latest PHP (8.4).
+- **`<MAJOR>`** (e.g., `501`): Points to the most recent Moodle version of that major on the **LTS PHP** (8.2).
+- **`<MAJOR>-php<VERSION>`** (e.g., `501-php8.3`): Points to a specific Moodle major on a specific PHP version (8.2, 8.3, or 8.4).
 
 ## Getting Started
 
