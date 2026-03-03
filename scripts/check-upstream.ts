@@ -70,16 +70,19 @@ async function fetchWorkflowConfig(): Promise<WorkflowConfig | null> {
 
 /**
  * Generic Git Tag Checker Factory
- * @param regexFactory A function that returns a RegExp given a context string
+ * @param filter A regex string or a custom filter function (tag, context) => boolean
  */
-const createGitTagChecker = (repo: string, regexFactory: (ctx: string) => RegExp) => 
+const createGitTagChecker = (repo: string, filter: string | ((tag: any, context: string) => boolean)) => 
   async (context: string, lastVersion: string) => {
     try {
       const response = await fetch(`https://api.github.com/repos/${repo}/tags`);
       const tags = await response.json();
       
-      const tagRegex = regexFactory(context);
-      const latest = tags.find((t: any) => tagRegex.test(t.name))?.name;
+      const isMatch = typeof filter === 'string'
+        ? (t: any) => new RegExp(filter).test(t.name)
+        : (t: any) => filter(t, context);
+
+      const latest = tags.find(isMatch)?.name;
 
       if (latest && latest !== lastVersion) {
         console.log(`NEW ${repo} VERSION: ${latest} (was ${lastVersion})`);
@@ -117,10 +120,10 @@ const createDockerDigestChecker = (repository: string) => async (tags: string[],
 };
 
 // Specialized Checkers
-// Moodle logic: major 501 -> v5.1.*
-const checkMoodleUpdate = createGitTagChecker(MOODLE_UPSTREAM, (major) => {
+// Moodle logic: maps major 501 -> v5.1.*
+const checkMoodleUpdate = createGitTagChecker(MOODLE_UPSTREAM, (tag, major) => {
   const majorStr = `${major[0]}.${parseInt(major.slice(1))}`;
-  return new RegExp(`^v${majorStr.replace('.', '\\.')}\\.\\d+`);
+  return new RegExp(`^v${majorStr.replace('.', '\\.')}\\.\\d+`).test(tag.name);
 });
 
 const checkPhpUpdates = createDockerDigestChecker("library/php");
