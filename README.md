@@ -63,6 +63,24 @@ environment:
   MOODLE_OAUTH2_CONFIG_JSON: '{"name":"MyIDP","baseurl":"https://idp.example.com","clientid":"id","clientsecret":"secret","enabled":1,"field_mappings":{"sub":"username","email":"email"}}'
 ```
 
+## CI/CD & Publishing
+
+This repository includes a GitHub Actions workflow to automatically build and publish the Moodle image to the **GitHub Container Registry (GHCR)**.
+
+### How to Publish
+1.  **Automated**: Every push to the `main` branch or a version tag (e.g., `v5.1.3`) triggers a build.
+2.  **Manual**: Go to the "Actions" tab in your GitHub repository and run the "Publish Moodle Image" workflow manually.
+
+### Using the Published Image
+To use the published image instead of building it locally, update your `docker-compose.yml`:
+
+```yaml
+services:
+  app:
+    image: ghcr.io/your-username/moodle-docker:main
+    # remove the 'build:' section
+```
+
 ## Getting Started
 
 1.  **Configure Environment**:
