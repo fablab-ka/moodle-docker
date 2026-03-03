@@ -141,44 +141,56 @@ async function triggerDispatch(moodleVersion: string): Promise<boolean> {
 }
 
 /**
- * Main Orchestrator
+ * Main Orchestrator (Promise Chain)
  */
 async function checkUpdates(state: State): Promise<State> {
-  const newState = JSON.parse(JSON.stringify(state));
-  let triggerReason = "";
+  const context = {
+    newState: JSON.parse(JSON.stringify(state)),
+    triggerReason: ""
+  };
 
-  // 0. Webhook
+  // 0. Initial Webhook Check (Synchronous)
   const webhook = checkWebhookTrigger(state);
   if (webhook.detected) {
-    newState.lastRepoTag = webhook.newTag;
-    triggerReason = "webhook";
+    context.newState.lastRepoTag = webhook.newTag;
+    context.triggerReason = "webhook";
   }
 
-  // 1. Config
-  const config = await fetchWorkflowConfig();
-  if (!config) return state;
+  // 1. Fetch Config -> 2. Parallel Upstream Checks -> 3. Decision & Dispatch
+  return fetchWorkflowConfig()
+    .then(config => {
+      if (!config) throw new Error("ConfigFetchFailed");
+      
+      // Run Moodle and PHP checks in parallel
+      return Promise.all([
+        Promise.resolve(config),
+        checkMoodleUpdate(config.moodleMajor, state.lastMoodleVersion),
+        checkPhpUpdates(config.phpTags, state.lastPhpDigests)
+      ]);
+    })
+    .then(([config, moodle, php]) => {
+      if (moodle.detected) {
+        context.newState.lastMoodleVersion = moodle.latest;
+        context.triggerReason = context.triggerReason || "moodle";
+      }
+      if (php.detected) {
+        context.newState.lastPhpDigests = php.digests;
+        context.triggerReason = context.triggerReason || "php";
+      }
 
-  // 2. Moodle
-  const moodle = await checkMoodleUpdate(config.moodleMajor, state.lastMoodleVersion);
-  if (moodle.detected) {
-    newState.lastMoodleVersion = moodle.latest;
-    triggerReason = "moodle";
-  }
+      if (context.triggerReason) {
+        return triggerDispatch(context.newState.lastMoodleVersion).then(success => {
+          if (success) console.log(`Build triggered successfully (Reason: ${context.triggerReason})`);
+          return context.newState;
+        });
+      }
 
-  // 3. PHP
-  const php = await checkPhpUpdates(config.phpTags, state.lastPhpDigests);
-  if (php.detected) {
-    newState.lastPhpDigests = php.digests;
-    triggerReason = "php";
-  }
-
-  // 4. Dispatch
-  if (triggerReason) {
-    const success = await triggerDispatch(newState.lastMoodleVersion);
-    if (success) console.log(`Build triggered successfully (Reason: ${triggerReason})`);
-  } else {
-    console.log("No updates found.");
-  }
-
-  return newState;
+      console.log("No updates found.");
+      return context.newState;
+    })
+    .catch(err => {
+      if (err.message === "ConfigFetchFailed") return state;
+      console.error("Pipeline error:", err);
+      return state;
+    });
 }
