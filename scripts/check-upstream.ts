@@ -17,6 +17,7 @@ const MOODLE_UPSTREAM = "moodle/moodle";
 interface State {
   lastMoodleVersion: string;
   lastPhpDigests: { [tag: string]: string };
+  lastRepoTag?: string;
 }
 
 /**
@@ -25,6 +26,25 @@ interface State {
 async function checkUpdates(state: State): Promise<State> {
   let updateDetected = false;
   const newState: State = JSON.parse(JSON.stringify(state));
+
+  // --- 0. Check for Webhook Trigger (moodle-docker repo) ---
+  // @ts-ignore - ARGS is provided by Komodo runtime
+  if (typeof ARGS !== 'undefined' && ARGS.WEBHOOK_BODY) {
+    try {
+      const payload = JSON.parse(ARGS.WEBHOOK_BODY);
+      // Check if this is a tag creation/push event (ref: refs/tags/v1.2.3)
+      if (payload.ref && payload.ref.startsWith('refs/tags/')) {
+        const newTag = payload.ref.replace('refs/tags/', '');
+        if (newTag !== state.lastRepoTag) {
+          console.log(`WEBHOOK: New tag detected in moodle-docker: ${newTag}`);
+          newState.lastRepoTag = newTag;
+          updateDetected = true;
+        }
+      }
+    } catch (e) {
+      console.error("Failed to parse WEBHOOK_BODY:", e);
+    }
+  }
 
   console.log("Fetching current configuration from main branch...");
   
