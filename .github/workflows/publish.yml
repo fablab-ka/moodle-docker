@@ -53,9 +53,13 @@ jobs:
             
             # Major version tag (e.g., 501) points to LTS PHP (8.2)
             type=raw,value=${{ env.MOODLE_MAJOR }},enable=${{ matrix.php_version == env.PHP_LTS }}
-            
-            # 'latest' tag points to newest major (501) and latest PHP (8.4)
+
+            # 'lts' tag points to latest major (501) and LTS PHP (8.2)
+            type=raw,value=lts,enable=${{ matrix.php_version == env.PHP_LTS }}
+
+            # 'latest' tag points to latest major (501) and latest PHP (8.4)
             type=raw,value=latest,enable=${{ matrix.php_version == env.PHP_LATEST }}
+
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5

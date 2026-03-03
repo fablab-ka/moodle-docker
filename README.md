@@ -84,6 +84,7 @@ services:
 #### Available Tags
 The image is published with the following tagging strategy:
 - **`latest`**: Points to the most recent Moodle version on the latest PHP (8.4).
+- **`lts`**: Points to the most recent Moodle version on the **LTS PHP** (8.2).
 - **`<MAJOR>`** (e.g., `501`): Points to the most recent Moodle version of that major on the **LTS PHP** (8.2).
 - **`<MAJOR>-php<VERSION>`** (e.g., `501-php8.3`): Points to a specific Moodle major on a specific PHP version (8.2, 8.3, or 8.4).
 
