@@ -69,11 +69,11 @@ async function fetchWorkflowConfig(): Promise<WorkflowConfig | null> {
 }
 
 /**
- * 2. Check Moodle Tags (Filtered by major)
+ * Generic Git Tag Checker Factory
  */
-async function checkMoodleUpdate(major: string, lastVersion: string): Promise<{ detected: boolean; latest?: string }> {
+const createGitTagChecker = (repo: string) => async (major: string, lastVersion: string) => {
   try {
-    const response = await fetch(`https://api.github.com/repos/${MOODLE_UPSTREAM}/tags`);
+    const response = await fetch(`https://api.github.com/repos/${repo}/tags`);
     const tags = await response.json();
     
     const majorStr = `${major[0]}.${parseInt(major.slice(1))}`;
@@ -81,39 +81,43 @@ async function checkMoodleUpdate(major: string, lastVersion: string): Promise<{ 
     const latest = tags.find((t: any) => tagRegex.test(t.name))?.name;
 
     if (latest && latest !== lastVersion) {
-      console.log(`NEW MOODLE VERSION: ${latest} (was ${lastVersion})`);
+      console.log(`NEW ${repo} VERSION: ${latest} (was ${lastVersion})`);
       return { detected: true, latest };
     }
   } catch (e) {
-    console.error("Moodle update check failed:", e);
+    console.error(`Git tag check failed for ${repo}:`, e);
   }
   return { detected: false };
-}
+};
 
 /**
- * 3. Check PHP Digests on Docker Hub
+ * Generic Docker Digest Checker Factory
  */
-async function checkPhpUpdates(tags: string[], lastDigests: { [tag: string]: string }): Promise<{ detected: boolean; digests: { [tag: string]: string } }> {
+const createDockerDigestChecker = (repository: string) => async (tags: string[], lastDigests: { [tag: string]: string }) => {
   let detected = false;
   const digests = { ...lastDigests };
 
   for (const tag of tags) {
     try {
-      const response = await fetch(`https://hub.docker.com/v2/repositories/library/php/tags/${tag}`);
+      const response = await fetch(`https://hub.docker.com/v2/repositories/${repository}/tags/${tag}`);
       const data = await response.json();
       const current = data.images?.[0]?.digest;
 
       if (current && current !== lastDigests[tag]) {
-        console.log(`NEW PHP DIGEST for ${tag}: ${current}`);
+        console.log(`NEW ${repository}:${tag} DIGEST: ${current}`);
         digests[tag] = current;
         detected = true;
       }
     } catch (e) {
-      console.error(`PHP update check failed for ${tag}:`, e);
+      console.error(`Docker digest check failed for ${repository}:${tag}:`, e);
     }
   }
   return { detected, digests };
-}
+};
+
+// Specialized Checkers
+const checkMoodleUpdate = createGitTagChecker(MOODLE_UPSTREAM);
+const checkPhpUpdates = createDockerDigestChecker("library/php");
 
 /**
  * 4. Trigger GitHub Repository Dispatch
@@ -161,7 +165,6 @@ async function checkUpdates(state: State): Promise<State> {
     .then(config => {
       if (!config) throw new Error("ConfigFetchFailed");
       
-      // Run Moodle and PHP checks in parallel
       return Promise.all([
         Promise.resolve(config),
         checkMoodleUpdate(config.moodleMajor, state.lastMoodleVersion),
