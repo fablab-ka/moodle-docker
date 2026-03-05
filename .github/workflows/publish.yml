@@ -23,7 +23,7 @@ jobs:
       fail-fast: false
       matrix:
         php_version: ['8.2', '8.3', '8.4']
-    
+
     permissions:
       contents: read
       packages: write
@@ -42,6 +42,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Get current date
+        id: date
+        run: echo "date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_OUTPUT
+
       - name: Extract metadata (tags, labels)
         id: meta
         uses: docker/metadata-action@v5
@@ -50,7 +54,7 @@ jobs:
           tags: |
             # Primary versioned tag (e.g., 501-php8.4)
             type=raw,value=${{ env.MOODLE_MAJOR }}-php${{ matrix.php_version }}
-            
+
             # Major version tag (e.g., 501) points to LTS PHP (8.2)
             type=raw,value=${{ env.MOODLE_MAJOR }},enable=${{ matrix.php_version == env.PHP_LTS }}
 
@@ -59,6 +63,9 @@ jobs:
 
             # 'latest' tag points to latest major (501) and latest PHP (8.4)
             type=raw,value=latest,enable=${{ matrix.php_version == env.PHP_LATEST }}
+          labels: |
+            org.opencontainers.image.version=${{ env.MOODLE_VERSION }}-php${{ matrix.php_version }}
+            org.opencontainers.image.description=Moodle ${{ env.MOODLE_VERSION }} on PHP ${{ matrix.php_version }} | Ref: ${{ github.ref_name }} | Built: ${{ steps.date.outputs.date }}
 
 
       - name: Build and push Docker image
