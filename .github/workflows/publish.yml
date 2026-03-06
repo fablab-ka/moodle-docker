@@ -83,8 +83,9 @@ jobs:
           # Disable provenance and sbom to avoid 'unknown/unknown' artifacts in GHCR
           provenance: false
           sbom: false
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Use unique scope per PHP version to prevent matrix cache collisions
+          cache-from: type=gha,scope=php-${{ matrix.php_version }}
+          cache-to: type=gha,mode=max,scope=php-${{ matrix.php_version }}
           build-args: |
             PHP_VERSION=${{ matrix.php_version }}
             MOODLE_VERSION=${{ env.MOODLE_VERSION }}
