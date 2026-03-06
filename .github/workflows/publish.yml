@@ -66,7 +66,11 @@ jobs:
           labels: |
             org.opencontainers.image.version=${{ env.MOODLE_VERSION }}-php${{ matrix.php_version }}
             org.opencontainers.image.description=Moodle ${{ env.MOODLE_VERSION }} on PHP ${{ matrix.php_version }} | Ref: ${{ github.ref_name }} | Built: ${{ steps.date.outputs.date }}
-
+            org.opencontainers.image.source=${{ github.event.repository.html_url }}
+          annotations: |
+            org.opencontainers.image.version=${{ env.MOODLE_VERSION }}-php${{ matrix.php_version }}
+            org.opencontainers.image.description=Moodle ${{ env.MOODLE_VERSION }} on PHP ${{ matrix.php_version }} | Ref: ${{ github.ref_name }} | Built: ${{ steps.date.outputs.date }}
+            org.opencontainers.image.source=${{ github.event.repository.html_url }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -75,6 +79,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
+          # Disable provenance and sbom to avoid 'unknown/unknown' artifacts in GHCR
+          provenance: false
+          sbom: false
           cache-from: type=gha
           cache-to: type=gha,mode=max
           build-args: |
