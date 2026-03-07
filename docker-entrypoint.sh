@@ -9,10 +9,8 @@ fi
 
 # --- 1. CONFIGURATION PHASE ---
 if [ "$IS_WORKER" = "false" ]; then
-    # Only the App container generates the config.php
-    if [ ! -f /var/www/html/config.php ]; then
-        echo "Generating stateless config.php..."
-        cat <<EOF > /var/www/html/config.php
+    echo "Generating stateless config.php..."
+    cat <<EOF > /var/www/html/config.php
 <?php
 unset(\$CFG);
 global \$CFG;
@@ -30,6 +28,11 @@ global \$CFG;
   'dbport' => getenv('MOODLE_DB_PORT') ?: '5432',
   'dbsocket' => '',
 );
+
+// Database-specific overrides
+if (\$CFG->dbtype === 'mysqli') {
+    \$CFG->dboptions['dbcollation'] = 'utf8mb4_unicode_ci';
+}
 
 \$CFG->wwwroot   = getenv('MOODLE_URL') ?: 'http://localhost';
 \$CFG->dataroot  = '/var/www/moodledata';
