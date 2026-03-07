@@ -3,16 +3,16 @@ unset($CFG);
 global $CFG;
 $CFG = new stdClass();
 
-$CFG->dbtype    = '${MOODLE_DB_TYPE}';
+$CFG->dbtype    = getenv('MOODLE_DB_TYPE') ?: 'pgsql';
 $CFG->dblibrary = 'native';
-$CFG->dbhost    = '${MOODLE_DB_HOST}';
-$CFG->dbname    = '${MOODLE_DB_NAME}';
-$CFG->dbuser    = '${MOODLE_DB_USER}';
-$CFG->dbpass    = '${MOODLE_DB_PASS}';
+$CFG->dbhost    = getenv('MOODLE_DB_HOST') ?: 'db';
+$CFG->dbname    = getenv('MOODLE_DB_NAME') ?: 'moodle';
+$CFG->dbuser    = getenv('MOODLE_DB_USER') ?: 'moodle';
+$CFG->dbpass    = getenv('MOODLE_DB_PASS') ?: 'moodle';
 $CFG->prefix    = 'mdl_';
 $CFG->dboptions = array (
   'dbpersist' => 0,
-  'dbport' => '${MOODLE_DB_PORT}',
+  'dbport' => getenv('MOODLE_DB_PORT') ?: '5432',
   'dbsocket' => '',
 );
 
@@ -22,7 +22,7 @@ if ($CFG->dbtype === 'mysqli') {
     $CFG->dboptions['dbsetnames'] = true;
 }
 
-$CFG->wwwroot   = '${MOODLE_URL}';
+$CFG->wwwroot   = getenv('MOODLE_URL') ?: 'http://localhost';
 $CFG->dataroot  = '/var/www/moodledata';
 $CFG->dirroot   = '/var/www/html';
 $CFG->libdir    = '/var/www/html';
