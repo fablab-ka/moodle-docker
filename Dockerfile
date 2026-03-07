@@ -2,7 +2,7 @@ ARG PHP_VERSION=8.4
 ARG MOODLE_VERSION=5.1.3
 ARG MOODLE_MAJOR_VERSION=501
 
-FROM php:${PHP_VERSION}-fpm-trixie
+FROM php:${PHP_VERSION}-fpm
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
