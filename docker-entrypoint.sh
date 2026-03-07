@@ -10,12 +10,7 @@ fi
 # Runner for modular entrypoint scripts
 if [ -d "/docker-entrypoint.d" ]; then
     echo "Running entrypoint scripts in /docker-entrypoint.d/..."
-    for f in /docker-entrypoint.d/*.sh; do
-        [ -e "$f" ] || continue
-        echo " -> Executing $f"
-        # shellcheck source=/dev/null
-        . "$f"
-    done
+    run-parts --exit-on-error --regex '.*\.sh$' /docker-entrypoint.d
 fi
 
 # Execution Phase
