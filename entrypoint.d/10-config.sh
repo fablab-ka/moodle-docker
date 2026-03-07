@@ -4,7 +4,7 @@ set -e
 if [ "$IS_WORKER" = "false" ]; then
     echo "Generating stateless config.php from template..."
     
-    cp /opt/moodle/templates/config.php.template /var/www/html/config.php
+    cp "${MOODLE_DOCKER_ROOT}/templates/config.php.template" /var/www/html/config.php
     chown www-data:www-data /var/www/html/config.php
 else
     # Workers wait for config.php to be created by the app container

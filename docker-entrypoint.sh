@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Define internal paths
+export MOODLE_DOCKER_ROOT="/opt/moodle"
+
 # Define if we are a worker/cron container
 export IS_WORKER=false
 if [[ "$1" == "cron" || "$1" == "worker" ]]; then

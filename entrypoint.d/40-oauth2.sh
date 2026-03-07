@@ -9,8 +9,8 @@ if [ "$IS_WORKER" = "false" ]; then
         CONFIG_VAL="${!var}"
         if [ -n "$CONFIG_VAL" ]; then
             echo "Configuring OAuth2 Issuer from $var (via stdin)..."
-            php /opt/moodle/scripts/manage_oauth2_issuer.php <<< "$CONFIG_VAL"
-
+            php "${MOODLE_DOCKER_ROOT}/scripts/manage_oauth2_issuer.php" <<< "$CONFIG_VAL"
         fi
     done
+
 fi
