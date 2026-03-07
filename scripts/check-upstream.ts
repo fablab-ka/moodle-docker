@@ -117,8 +117,9 @@ const createGitChecker = (key: string, tagsApiUrl: string, filter: string | ((ta
 
       // We check for all keys currently in the github state for this checker
       for (const major of Object.keys(state.git[key])) {
-        const latest = tags.find(tag => tagFilter(tag, major))?.name;
-        if (latest && latest !== state.git[key][major]) {
+        const tag = tags.find(tag => tagFilter(tag, major));
+        const latest = `${tag?.name}:${tag?.commit?.sha?.substring(0, 12)}`;
+        if (tag && latest && latest !== state.git[key][major]) {
           console.log(`NEW ${key}:${major} VERSION: ${latest}`);
           state.git[key][major] = latest;
           state.triggers.push(`git:${key}:${major}:${latest}`);
@@ -149,7 +150,7 @@ const createDockerChecker = (key: string, registryTagsUrl: string): Checker =>
         if (digest && digest !== state.docker[key][tag]) {
           console.log(`NEW ${key}:${tag} DIGEST: ${digest}`);
           state.docker[key][tag] = digest;
-          state.triggers.push(`docker:${key}:${tag}:${digest.substring(7, 15)}`);
+          state.triggers.push(`docker:${key}:${tag}:${digest.substring(7, 19)}`);
         }
       } catch (e) {
         console.error(`Docker digest check failed for ${key}:${tag}:`, e);
