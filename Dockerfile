@@ -1,6 +1,8 @@
 ARG PHP_VERSION=8.4
 ARG MOODLE_VERSION=5.1.3
 ARG MOODLE_MAJOR_VERSION=501
+ARG ADDITIONAL_APT_PACKAGES=""
+ARG ADDITIONAL_PHP_EXTENSIONS=""
 
 FROM php:${PHP_VERSION}-fpm
 
@@ -19,6 +21,7 @@ RUN apt-get update && apt-get install -y \
     libz-dev \
     curl \
     gettext-base \
+    ${ADDITIONAL_APT_PACKAGES} \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions using mlocati/php-extension-installer
@@ -36,7 +39,8 @@ RUN install-php-extensions \
     calendar \
     sockets \
     sodium \
-    redis
+    redis \
+    ${ADDITIONAL_PHP_EXTENSIONS}
 
 # Increase max_input_vars
 RUN echo "max_input_vars = 5000" >> /usr/local/etc/php/conf.d/docker-php-moodle.ini
