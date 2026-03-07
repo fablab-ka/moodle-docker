@@ -25,7 +25,8 @@ You can override and "lock" settings directly from your `docker-compose.yml` or 
 Core settings are automatically locked in the UI when defined.
 - `MOODLE_CFG_theme=boost` -> Forces the 'boost' theme.
 - `MOODLE_CFG_lang=de` -> Forces German language.
-- `MOODLE_CFG_sessiontimeout=3600` -> Sets session timeout to 1 hour.
+- `MOODLE_CFG_smtphosts=smtp.example.com:587` -> Sets the SMTP server.
+- `MOODLE_CFG_smtpuser=user@example.com` -> Sets the SMTP username.
 
 ### Plugin Settings (`MOODLE_PLG_`)
 Use the format `MOODLE_PLG_pluginname__settingname`. These are also automatically locked in the UI.

@@ -33,6 +33,12 @@ services:
       MOODLE_ADMIN_EMAIL: ${MOODLE_ADMIN_EMAIL}
       MOODLE_SITE_FULLNAME: ${MOODLE_SITE_FULLNAME:-Moodle Site}
       MOODLE_SITE_SHORTNAME: ${MOODLE_SITE_SHORTNAME:-Moodle}
+      # Email Configuration (SMTP)
+      MOODLE_CFG_smtphosts: ${MOODLE_SMTP_HOSTS:-}
+      MOODLE_CFG_smtpsecure: ${MOODLE_SMTP_SECURE:-tls}
+      MOODLE_CFG_smtpuser: ${MOODLE_SMTP_USER:-}
+      MOODLE_CFG_smtppass: ${MOODLE_SMTP_PASS:-}
+      MOODLE_CFG_noreplyaddress: ${MOODLE_NOREPLY_ADDRESS:-noreply@example.com}
     volumes:
       - moodle_code:/var/www/html
       - moodle_data:/var/www/moodledata
