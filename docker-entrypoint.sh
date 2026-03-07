@@ -32,6 +32,7 @@ global \$CFG;
 // Database-specific overrides
 if (\$CFG->dbtype === 'mysqli') {
     \$CFG->dboptions['dbcollation'] = 'utf8mb4_unicode_ci';
+    \$CFG->dboptions['dbsetnames'] = true;
 }
 
 \$CFG->wwwroot   = getenv('MOODLE_URL') ?: 'http://localhost';
