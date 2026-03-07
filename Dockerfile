@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
     libxslt1-dev \
     libz-dev \
     curl \
+    gettext-base \
     && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions using mlocati/php-extension-installer
@@ -56,11 +57,15 @@ RUN mkdir -p /var/www/moodledata \
 
 WORKDIR /var/www/html
 
-# Copy entrypoint and helper scripts
+# Copy entrypoint, step scripts, helper scripts and templates
 COPY docker-entrypoint.sh /usr/local/bin/
 COPY scripts/ /var/www/html/scripts/
+COPY entrypoint.d/ /docker-entrypoint.d/
+COPY templates/ /var/www/html/templates/
+
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
-    && chown -R www-data:www-data /var/www/html/scripts
+    && chmod +x /docker-entrypoint.d/*.sh \
+    && chown -R www-data:www-data /var/www/html/scripts /var/www/html/templates /docker-entrypoint.d
 
 # Environment variables with defaults
 ENV MOODLE_DB_TYPE=pgsql \
