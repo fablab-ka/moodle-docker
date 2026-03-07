@@ -1,0 +1,9 @@
+--- lib/setup.php
++++ lib/setup.php
+@@ -24,5 +24,5 @@
+  */
+ 
+ if (property_exists($CFG, 'dirroot') && !str_ends_with($CFG->dirroot, '/public')) {
+-    $CFG->libdir = $CFG->libdir . '/lib';
++    $CFG->libdir = $CFG->dirroot . '/lib';
+ }
