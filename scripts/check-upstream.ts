@@ -103,30 +103,80 @@ async function mergeConfigIntoState(obj: { state: State, config: WorkflowConfig 
 /**
  * Generic Git Tag Checker Factory
  */
-const createGitChecker = (repo: string, stateKey: keyof State, filter: (tag: any, config: WorkflowConfig, state: State) => boolean): Checker => 
+const createGitChecker = (key: string, tagsApiUrl: string, filter: string | ((tag: any, context: string) => boolean)): Checker =>
   async (state) => {
-    // Placeholder for factory logic to keep interfaces compatible for now
-    return state;
+    if (!(key in state.git)) {
+      state.git[key] = {};
+    }
+
+    try {
+      const tagFilter = typeof filter === 'function'
+        ? filter : ((flt, tag) => new RegExp(flt).test(tag.name)).bind(null, filter);
+
+      const tags = await fetch(tagsApiUrl).then(r => r.json());
+
+      for (const major of Object.keys(state.git[key])) {
+        const latest = tags.find(tag => tagFilter(tag, major))?.name;
+        if (latest && latest !== state.git[key][major]) {
+          console.log(`NEW ${key}:${major} VERSION: ${latest}`);
+          state.git[key][major] = latest;
+          state.triggers.push(`git:${key}:${major}:${latest}`);
+        }
+      }
+
+      return state;
+    } catch (e) {
+      console.error(`Git tag check failed for ${key}:`, e);
+    }
   };
 
 /**
  * Generic Docker Digest Checker Factory
  */
-const createDockerChecker = (registry: string, stateKey: 'phpDigests'): Checker => 
+const createDockerChecker = (key: string, registryTagsUrl: string): Checker =>
   async (state) => {
-    // Placeholder
-    return state;
+    if (!(key in state.docker)) {
+      state.docker[key] = {};
+    }
+
+    const digestCheck = async tag => {
+      try {
+        const digest = await fetch(`${registryTagsUrl}/${tag}`)
+          .then(r => r.json())
+          .then(data => data.images?.[0]?.digest);
+
+        if (digest && digest !== state.docker[key][tag]) {
+          console.log(`NEW ${key}:${tag} DIGEST: ${digest}`);
+          state.docker[key][tag] = digest;
+          state.triggers.push(`docker:${key}:${tag}:${digest.substring(7, 15)}`);
+        }
+      } catch (e) {
+        console.error(`Docker digest check failed for ${key}:${tag}:`, e);
+      }
+    };
+
+    return Promise.all(
+      Object.keys(state.docker[key]).map(digestCheck)
+    ).then(() => state);
   };
 
 // Specialized Checkers
-const checkMoodle = createGitChecker(MOODLE_UPSTREAM, 'git', (tag, config) => true);
-const checkPhp = createDockerChecker("library/php", 'docker' as any);
+const checkMoodle = createGitChecker(
+  MOODLE_UPSTREAM,
+  `https://api.github.com/repos/${MOODLE_UPSTREAM}/tags`,
+  (tag, major) => new RegExp(`^v${major[0]}\\.${parseInt(major.slice(1))}\\.\\d+(?!-rc)`).test(tag?.name)
+);
+
+const checkPhp = createDockerChecker(
+  PHP_UPSTREAM,
+  `https://hub.docker.com/v2/repositories/${PHP_UPSTREAM}/tags`
+);
 
 /**
  * 4. Trigger GitHub Repository Dispatch
  */
-async function triggerDispatch(state: State): Promise<boolean> {
-  console.log("Triggering GitHub workflow...");
+async function triggerGithubDispatch(state: State): Promise<[boolean, Response|null]> {
+  console.log(`Triggering GitHub build (Reasons: ${state.triggers.join(', ')})`);
   try {
     const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/dispatches`, {
       method: "POST",
@@ -145,12 +195,12 @@ async function triggerDispatch(state: State): Promise<boolean> {
             ...state.docker
           }
         },
-      }),
+      })
     });
-    return res.ok;
+    return [res.ok, res];
   } catch (e) {
     console.error("Dispatch trigger failed:", e);
-    return false;
+    return [false, null];
   }
 }
 
@@ -167,10 +217,14 @@ async function checkUpdates(state: State): Promise<State> {
       if (!config) throw new Error("ConfigFetchFailed");
       return mergeConfigIntoState({ state: newState, config });
     })
+    .then(state => 
+      Promise.allSettled([checkMoodle(state), checkPhp(state)])
+      .then(() => state))
     .then(state => {
       if (state.triggers.length > 0) {
-        return triggerDispatch(state).then(success => {
-          if (success) console.log("Build triggered successfully.");
+        return triggerGithubDispatch(state).then(async ([ok, res]) => {
+          if (!ok) throw new Error("TriggerBuildError");
+          console.log("Build triggered successfully.");
           return state;
         });
       }
