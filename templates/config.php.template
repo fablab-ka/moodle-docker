@@ -25,7 +25,7 @@ if ($CFG->dbtype === 'mysqli') {
 $CFG->wwwroot   = getenv('MOODLE_URL') ?: 'http://localhost';
 $CFG->dataroot  = '/var/www/moodledata';
 $CFG->dirroot   = '/var/www/html';
-$CFG->libdir    = '/var/www/html';
+$CFG->libdir    = '/var/www/html/lib';
 $CFG->admin     = 'admin';
 
 $CFG->routerconfigured = true;

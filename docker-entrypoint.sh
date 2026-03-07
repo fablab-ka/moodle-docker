@@ -10,7 +10,7 @@ fi
 # Runner for modular entrypoint scripts
 if [ -d "/docker-entrypoint.d" ]; then
     echo "Running entrypoint scripts in /docker-entrypoint.d/..."
-    run-parts --exit-on-error --regex '.*\.sh$' /docker-entrypoint.d
+    run-parts --verbose --exit-on-error --regex '.*\.sh$' /docker-entrypoint.d
 fi
 
 # Execution Phase
@@ -20,8 +20,8 @@ case "$1" in
         ADHOC_COUNT=${MOODLE_ADHOC_TASK_COUNT:-0}
         echo "Starting worker loop ($CRON_COUNT cron, $ADHOC_COUNT adhoc)..."
         while true; do
-            for ((i=0; i<CRON_COUNT; i++)); do php /var/www/html/public/admin/cli/cron.php --keep-alive=59 & done
-            for ((i=0; i<ADHOC_COUNT; i++)); do php /var/www/html/public/admin/cli/adhoc_task.php --execute --keep-alive=59 & done
+            for ((i=0; i<CRON_COUNT; i++)); do php /var/www/html/admin/cli/cron.php --keep-alive=59 & done
+            for ((i=0; i<ADHOC_COUNT; i++)); do php /var/www/html/admin/cli/adhoc_task.php --execute --keep-alive=59 & done
             sleep 60
         done
         ;;
