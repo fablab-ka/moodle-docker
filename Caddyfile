@@ -1,9 +1,9 @@
 :80 {
     root * /var/www/html/public
     
-    # Moodle 5.1 Routing: try files, then fallback to r.php
+    # Moodle 5.1 Routing: try files, then index.php, then fallback to r.php
     php_fastcgi app:9000 {
-        try_files {path} {path}/ /r.php?{query}
+        try_files {path} {path}/index.php /r.php?{query}
     }
 
     file_server

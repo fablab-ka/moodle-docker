@@ -37,6 +37,8 @@ global \$CFG;
 \$CFG->libdir    = '/var/www/html';
 \$CFG->admin     = 'admin';
 
+\$CFG->routerconfigured = true;
+
 \$CFG->directorypermissions = 0777;
 
 // Proxy Settings
