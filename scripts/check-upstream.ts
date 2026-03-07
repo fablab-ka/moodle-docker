@@ -28,25 +28,25 @@ interface WorkflowConfig {
   phpVersions: string[];
 }
 
-type Checker = (state: State, config: WorkflowConfig) => Promise<boolean>;
+type Checker = (state: State) => Promise<State>;
 
 /**
  * 0. Check for Webhook Trigger (moodle-docker repo)
  */
-function checkWebhookTrigger(state: State): boolean {
+async function checkWebhookTrigger(state: State): Promise<State> {
   // @ts-ignore - ARGS is provided by Komodo runtime
   if (typeof ARGS !== 'undefined' && ARGS.WEBHOOK_BODY) {
     const payload = ARGS.WEBHOOK_BODY;
     if (payload.ref && payload.ref.startsWith('refs/tags/')) {
       const newTag = payload.ref.replace('refs/tags/', '');
-      if (newTag !== state.repoTag) {
+      if (newTag !== '' && newTag !== state.repoTag) {
         console.log(`WEBHOOK: New tag detected in moodle-docker: ${newTag}`);
         state.repoTag = newTag;
-        return true;
+        state.triggers.push(`repo:${newTag}`);
       }
     }
   }
-  return false;
+  return state;
 }
 
 /**
@@ -55,7 +55,7 @@ function checkWebhookTrigger(state: State): boolean {
 async function fetchWorkflowConfig(): Promise<WorkflowConfig | null> {
   console.log("Fetching current configuration from main branch...");
   try {
-    const url = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/main/.github/workflows/publish.yml`;
+    const url = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/.github/workflows/publish.yml`;
     const res = await fetch(url);
     const yaml = await res.text();
 
@@ -79,80 +79,48 @@ async function fetchWorkflowConfig(): Promise<WorkflowConfig | null> {
  * Syncs the state with the current workflow configuration
  */
 function syncState(state: State, config: WorkflowConfig) {
-  // Sync GitHub (Moodle)
-  const currentMajors = [config.moodleMajor];
-  Object.keys(state.github).forEach(k => {
-    if (!currentMajors.includes(k)) delete state.github[k];
-  });
-  currentMajors.forEach(k => {
-    if (!(k in state.github)) state.github[k] = "";
-  });
+  const syncForUpstream = (checker: string, upstream: string, versions: string[]) => {
+    // @ts-ignore
+    checker in state || (state[checker] = {});
+    // @ts-ignore
+    upstream in state[checker] || (state[checker][upstream] = {});
 
-  // Sync DockerHub (PHP)
-  const currentPhpTags = config.phpVersions.map(v => `${v}-fpm-trixie`);
-  Object.keys(state.dockerhub).forEach(k => {
-    if (!currentPhpTags.includes(k)) delete state.dockerhub[k];
-  });
-  currentPhpTags.forEach(k => {
-    if (!(k in state.dockerhub)) state.dockerhub[k] = "";
-  });
+    // @ts-ignore
+    Object.keys(state[checker][upstream]).forEach(sV => versions.includes(sV) || (delete state[checker][upstream][sV]));
+    // @ts-ignore
+    versions.forEach(cV => cV in state[checker][upstream] || (state[checker][upstream][cV] = ""));
+  };
+
+  syncForUpstream('git', MOODLE_UPSTREAM, [config.moodleMajor]);
+  syncForUpstream('docker', PHP_UPSTREAM, config.phpVersions.map(v => `${v}-fpm`));
+}
+
+async function mergeConfigIntoState(obj: { state: State, config: WorkflowConfig }): Promise<State> {
+  syncState(obj.state, obj.config);
+  return obj.state;
 }
 
 /**
  * Generic Git Tag Checker Factory
  */
 const createGitChecker = (repo: string, stateKey: keyof State, filter: (tag: any, config: WorkflowConfig, state: State) => boolean): Checker => 
-  async (state, config) => {
-    try {
-      const response = await fetch(`https://api.github.com/repos/${repo}/tags`);
-      const tags = await response.json();
-      const latest = tags.find((t: any) => filter(t, config, state))?.name;
-
-      if (latest && latest !== state[stateKey]) {
-        console.log(`NEW ${repo} VERSION: ${latest} (was ${state[stateKey]})`);
-        state[stateKey] = latest as any;
-        return true;
-      }
-    } catch (e) {
-      console.error(`Git tag check failed for ${repo}:`, e);
-    }
-    return false;
+  async (state) => {
+    // Placeholder for factory logic to keep interfaces compatible for now
+    return state;
   };
 
 /**
  * Generic Docker Digest Checker Factory
  */
 const createDockerChecker = (registry: string, stateKey: 'phpDigests'): Checker => 
-  async (state, config) => {
-    let detected = false;
-    // Assume config has a list of tags to check for this registry
-    // In our case, we always check config.phpTags
-    for (const tag of config.phpTags) {
-      try {
-        const response = await fetch(`https://hub.docker.com/v2/repositories/${registry}/tags/${tag}`);
-        const data = await response.json();
-        const current = data.images?.[0]?.digest;
-
-        if (current && current !== state[stateKey][tag]) {
-          console.log(`NEW ${registry}:${tag} DIGEST: ${current}`);
-          state[stateKey][tag] = current;
-          detected = true;
-        }
-      } catch (e) {
-        console.error(`Docker digest check failed for ${registry}:${tag}:`, e);
-      }
-    }
-    return detected;
+  async (state) => {
+    // Placeholder
+    return state;
   };
 
 // Specialized Checkers
-const checkMoodle = createGitChecker(MOODLE_UPSTREAM, 'moodleVersion', (tag, config) => {
-  const major = config.moodleMajor;
-  const majorStr = `${major[0]}.${parseInt(major.slice(1))}`;
-  return new RegExp(`^v${majorStr.replace('.', '\\.')}\\.\\d+`).test(tag.name);
-});
-
-const checkPhp = createDockerChecker("library/php", 'phpDigests');
+const checkMoodle = createGitChecker(MOODLE_UPSTREAM, 'git', (tag, config) => true);
+const checkPhp = createDockerChecker("library/php", 'docker' as any);
 
 /**
  * 4. Trigger GitHub Repository Dispatch
@@ -160,7 +128,7 @@ const checkPhp = createDockerChecker("library/php", 'phpDigests');
 async function triggerDispatch(state: State): Promise<boolean> {
   console.log("Triggering GitHub workflow...");
   try {
-    const res = await fetch(`https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/dispatches`, {
+    const res = await fetch(`https://api.github.com/repos/${GITHUB_REPO}/dispatches`, {
       method: "POST",
       headers: {
         "Accept": "application/vnd.github.v3+json",
@@ -170,8 +138,12 @@ async function triggerDispatch(state: State): Promise<boolean> {
       body: JSON.stringify({
         event_type: "upstream_update",
         client_payload: {
-          moodle_version: state.moodleVersion,
-          repo_tag: state.repoTag
+          triggers: state.triggers,
+          versions: {
+            ...(state.repoTag && { repo: state.repoTag }),
+            ...state.git,
+            ...state.docker
+          }
         },
       }),
     });
@@ -187,36 +159,25 @@ async function triggerDispatch(state: State): Promise<boolean> {
  */
 async function checkUpdates(state: State): Promise<State> {
   const newState: State = JSON.parse(JSON.stringify(state));
+  newState.triggers = [];
   
-  // 0. Synchronous Webhook Check
-  const webhookDetected = checkWebhookTrigger(newState);
-
-  return fetchWorkflowConfig()
+  return checkWebhookTrigger(newState)
+    .then(fetchWorkflowConfig)
     .then(config => {
       if (!config) throw new Error("ConfigFetchFailed");
-      
-      // 1. Run Checkers in Parallel
-      const checkers: Checker[] = [checkMoodle, checkPhp];
-      return Promise.all([
-        Promise.resolve(config),
-        ...checkers.map(check => check(newState, config))
-      ]);
+      return mergeConfigIntoState({ state: newState, config });
     })
-    .then(([config, ...results]) => {
-      const updatesDetected = results.some(r => r === true) || webhookDetected;
-
-      if (updatesDetected) {
-        return triggerDispatch(newState).then(success => {
+    .then(state => {
+      if (state.triggers.length > 0) {
+        return triggerDispatch(state).then(success => {
           if (success) console.log("Build triggered successfully.");
-          return newState;
+          return state;
         });
       }
-
       console.log("No updates found.");
-      return newState;
+      return state;
     })
     .catch(err => {
-      if (err.message === "ConfigFetchFailed") return state;
       console.error("Pipeline error:", err);
       return state;
     });
