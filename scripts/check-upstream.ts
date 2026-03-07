@@ -31,38 +31,40 @@ interface WorkflowConfig {
 type Checker = (state: State) => Promise<State>;
 
 /**
- * 0. Check for Webhook Trigger (moodle-docker repo)
+ * Check for Webhook Trigger
  */
 async function checkWebhookTrigger(state: State): Promise<State> {
-  // @ts-ignore - ARGS is provided by Komodo runtime
   if (typeof ARGS !== 'undefined' && ARGS.WEBHOOK_BODY) {
     const payload = ARGS.WEBHOOK_BODY;
     if (payload.ref && payload.ref.startsWith('refs/tags/')) {
       const newTag = payload.ref.replace('refs/tags/', '');
       if (newTag !== '' && newTag !== state.repoTag) {
-        console.log(`WEBHOOK: New tag detected in moodle-docker: ${newTag}`);
+        console.log(`WEBHOOK: New tag detected in webhook payload: ${newTag}`);
         state.repoTag = newTag;
         state.triggers.push(`repo:${newTag}`);
       }
     }
   }
+
   return state;
 }
 
 /**
- * 1. Fetch current publish.yml to get dynamic configuration
+ * Fetch current publish.yml to get dynamic configuration
  */
 async function fetchWorkflowConfig(): Promise<WorkflowConfig | null> {
   console.log("Fetching current configuration from main branch...");
   try {
     const url = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/.github/workflows/publish.yml`;
-    const res = await fetch(url);
-    const yaml = await res.text();
+    const yaml = await fetch(url).then(r => r.text());
 
     const majorMatch = yaml.match(/MOODLE_MAJOR:\s*(\d+)/);
     const phpMatch = yaml.match(/php_version:\s*\[([^\]]+)\]/);
 
-    if (!majorMatch || !phpMatch) throw new Error("Parse error");
+    if (!majorMatch || !phpMatch) {
+      console.error("Required fields MOODLE_MAJOR and php_version missing:", yaml);
+      throw new Error("Parse error");
+    }
 
     const phpVersions = phpMatch[1]
       .split(',')
@@ -79,15 +81,12 @@ async function fetchWorkflowConfig(): Promise<WorkflowConfig | null> {
  * Syncs the state with the current workflow configuration
  */
 function syncState(state: State, config: WorkflowConfig) {
+
   const syncForUpstream = (checker: string, upstream: string, versions: string[]) => {
-    // @ts-ignore
     checker in state || (state[checker] = {});
-    // @ts-ignore
     upstream in state[checker] || (state[checker][upstream] = {});
 
-    // @ts-ignore
     Object.keys(state[checker][upstream]).forEach(sV => versions.includes(sV) || (delete state[checker][upstream][sV]));
-    // @ts-ignore
     versions.forEach(cV => cV in state[checker][upstream] || (state[checker][upstream][cV] = ""));
   };
 
@@ -97,6 +96,7 @@ function syncState(state: State, config: WorkflowConfig) {
 
 async function mergeConfigIntoState(obj: { state: State, config: WorkflowConfig }): Promise<State> {
   syncState(obj.state, obj.config);
+
   return obj.state;
 }
 
@@ -115,6 +115,7 @@ const createGitChecker = (key: string, tagsApiUrl: string, filter: string | ((ta
 
       const tags = await fetch(tagsApiUrl).then(r => r.json());
 
+      // We check for all keys currently in the github state for this checker
       for (const major of Object.keys(state.git[key])) {
         const latest = tags.find(tag => tagFilter(tag, major))?.name;
         if (latest && latest !== state.git[key][major]) {
@@ -160,20 +161,8 @@ const createDockerChecker = (key: string, registryTagsUrl: string): Checker =>
     ).then(() => state);
   };
 
-// Specialized Checkers
-const checkMoodle = createGitChecker(
-  MOODLE_UPSTREAM,
-  `https://api.github.com/repos/${MOODLE_UPSTREAM}/tags`,
-  (tag, major) => new RegExp(`^v${major[0]}\\.${parseInt(major.slice(1))}\\.\\d+(?!-rc)`).test(tag?.name)
-);
-
-const checkPhp = createDockerChecker(
-  PHP_UPSTREAM,
-  `https://hub.docker.com/v2/repositories/${PHP_UPSTREAM}/tags`
-);
-
 /**
- * 4. Trigger GitHub Repository Dispatch
+ * Trigger GitHub Repository Dispatch
  */
 async function triggerGithubDispatch(state: State): Promise<[boolean, Response|null]> {
   console.log(`Triggering GitHub build (Reasons: ${state.triggers.join(', ')})`);
@@ -208,31 +197,83 @@ async function triggerGithubDispatch(state: State): Promise<[boolean, Response|n
  * Main Orchestrator (Promise Chain)
  */
 async function checkUpdates(state: State): Promise<State> {
-  const newState: State = JSON.parse(JSON.stringify(state));
-  newState.triggers = [];
-  
-  return checkWebhookTrigger(newState)
+  if (!state.error) {
+    // Clear triggers when previous run had no errors
+    state.triggers = [];
+  }
+
+  return checkWebhookTrigger(state)
     .then(fetchWorkflowConfig)
     .then(config => {
-      if (!config) throw new Error("ConfigFetchFailed");
-      return mergeConfigIntoState({ state: newState, config });
+      if (!config) {
+        throw new Error("ConfigFetchFailed");
+      }
+      return { state, config };
     })
-    .then(state => 
-      Promise.allSettled([checkMoodle(state), checkPhp(state)])
+    .then(mergeConfigIntoState)
+    .then(state =>
+      Promise.allSettled(
+        ([
+          createGitChecker(
+            MOODLE_UPSTREAM,
+            `https://api.github.com/repos/${MOODLE_UPSTREAM}/tags`,
+            (tag, major) => new RegExp(`^v${major[0]}\\.${parseInt(major.slice(1))}\\.\\d+(?!-rc)`).test(tag?.name)
+          ),
+          createDockerChecker(
+            PHP_UPSTREAM,
+            `https://hub.docker.com/v2/repositories/${PHP_UPSTREAM}/tags`
+          )
+        ]).map(checker => checker(state))
+      )
       .then(() => state))
     .then(state => {
-      if (state.triggers.length > 0) {
-        return triggerGithubDispatch(state).then(async ([ok, res]) => {
-          if (!ok) throw new Error("TriggerBuildError");
+      if (state.triggers.length <= 0) {
+        console.log("No updates found.");
+        return state;
+      }
+
+      return triggerGithubDispatch(state)
+        .then(async ([ok, res]) => {
+          let body = res ? await res.text() : undefined;
+          try { body = JSON.parse(body); } catch {}
+
+          if (!ok) {
+            console.error("Build failed to trigger", { status: `${res.status} ${res.statusText}`, url: res.url, body });
+            throw new Error("TriggerBuildError");
+          }
+
           console.log("Build triggered successfully.");
           return state;
         });
-      }
-      console.log("No updates found.");
-      return state;
     })
+    .then(state => (delete state.error, state))
     .catch(err => {
       console.error("Pipeline error:", err);
+      state.error = err.toString();
       return state;
     });
 }
+
+async function loadState(): Promise<State> {
+  const emptyState = { git: {}, docker: {}, repoTag: "", triggers: [] };
+
+  const state = await komodo.read('GetVariable', { 'name': KOMODO_VAR_KEY })
+    .then(variable => variable?.value || "")
+    .then(JSON.parse)
+    .catch(() => null) || {};
+
+  Object.entries(emptyState)
+    .forEach(([k, v]) => k in state || (state[k] = v));
+
+  return state;
+}
+
+async function saveState(state: State) {
+  console.log(`${state.error ? '❌' : (state?.triggers?.length ? '✅' : '☑️')} ${GITHUB_REPO}: check for updates ${state.error ? 'failure' : 'success'}`, state);
+
+  return komodo.write('UpdateVariableValue', { 'name': KOMODO_VAR_KEY, 'value': JSON.stringify(state) });
+}
+
+loadState()
+  .then(checkUpdates)
+  .then(saveState);
