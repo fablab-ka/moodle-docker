@@ -23,6 +23,7 @@ RUN apt-get update && apt-get install -y \
     gettext-base \
     patch \
     less \
+    rsync \
     ${ADDITIONAL_APT_PACKAGES} \
     && rm -rf /var/lib/apt/lists/*
 
@@ -51,10 +52,10 @@ RUN echo "max_input_vars = 5000" >> /usr/local/etc/php/conf.d/docker-php-moodle.
 ARG MOODLE_VERSION
 ARG MOODLE_MAJOR_VERSION
 ENV MOODLE_VERSION=${MOODLE_VERSION}
-RUN curl -fSL "https://download.moodle.org/download.php/direct/stable${MOODLE_MAJOR_VERSION}/moodle-${MOODLE_VERSION}.tgz" -o moodle.tgz \
-    && tar -xzf moodle.tgz --strip-components=1 -C /var/www/html \
-    && rm moodle.tgz \
-    && chown -R www-data:www-data /var/www/html
+RUN mkdir -p /opt/moodle/code \
+    && curl -fSL "https://download.moodle.org/download.php/direct/stable${MOODLE_MAJOR_VERSION}/moodle-${MOODLE_VERSION}.tgz" -o moodle.tgz \
+    && tar -xzf moodle.tgz --strip-components=1 -C /opt/moodle/code \
+    && rm moodle.tgz
 
 # Create moodledata directory
 RUN mkdir -p /var/www/moodledata \
@@ -70,11 +71,11 @@ COPY entrypoint.d/ /docker-entrypoint.d/
 COPY templates/ /opt/moodle/templates/
 COPY patches/ /opt/moodle/patches/
 
-# Apply patches
+# Apply patches to the source of truth
 RUN for p in /opt/moodle/patches/*.patch; do \
         [ -e "$p" ] || continue; \
         echo "Applying patch $p"; \
-        patch -p0 < "$p"; \
+        patch -p0 -d /opt/moodle/code < "$p"; \
     done
 
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \

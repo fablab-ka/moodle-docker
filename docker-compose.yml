@@ -39,9 +39,14 @@ services:
       MOODLE_CFG_smtpuser: ${MOODLE_SMTP_USER:-}
       MOODLE_CFG_smtppass: ${MOODLE_SMTP_PASS:-}
       MOODLE_CFG_noreplyaddress: ${MOODLE_NOREPLY_ADDRESS:-noreply@example.com}
+      # MOODLE_DOCKER_SYNC_EXCLUDE: "mod/my_plugin theme/my_theme"
     volumes:
       - moodle_code:/var/www/html
       - moodle_data:/var/www/moodledata
+      # DANGER: By default, the image syncs code to the volume and DELETES unknown files.
+      # If you mount plugins/themes below, you MUST also add them to MOODLE_DOCKER_SYNC_EXCLUDE above.
+      # - ./my_plugin:/var/www/html/mod/my_plugin
+      # - ./my_theme:/var/www/html/theme/my_theme
     depends_on:
       - db
 

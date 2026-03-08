@@ -4,18 +4,18 @@ This is a professional-grade, multi-container Moodle deployment designed for eas
 
 ## Architecture: Server-Worker Pattern
 
-This setup uses a **shared custom image** for both the application and the background worker.
+This setup uses a **shared custom image** for all services (`app`, `cron`, and `web`).
 
 - **`app`**: Runs PHP-FPM to serve Moodle requests.
-- **`cron`**: Runs the same image but executes the Moodle cron loop in a CLI environment.
+- **`cron`**: Executes the Moodle cron and ad-hoc task loop.
 - **`web`**: A Caddy server that serves static assets directly from the shared code volume and proxies PHP requests to `app`.
 - **`db`**: A PostgreSQL database container.
 
 ### Key Features
-- **Stateless Configuration**: `config.php` is generated dynamically from environment variables.
-- **Automated Install/Upgrade**: The system automatically installs Moodle on an empty database or upgrades it if `MOODLE_AUTO_UPGRADE=true`.
-- **Single Image Updates**: Updating the Moodle version is as simple as changing a single tag in your CI/CD pipeline or `.env` file.
-- **Forced Settings**: Pre-configure any Moodle setting via environment variables and "lock" it from changes in the web UI.
+- **Stateless Configuration**: `config.php` is generated dynamically from environment variables on boot.
+- **Modular Entrypoint**: Uses `run-parts` to execute idempotent step scripts in `/docker-entrypoint.d/`.
+- **Patched Source**: Moodle core code is patched during the build process.
+- **Forced Settings**: Pre-configure any Moodle setting via `MOODLE_CFG_` or `MOODLE_PLG_` environment variables.
 
 ## Configuration Overrides & Locking
 
@@ -26,75 +26,60 @@ Core settings are automatically locked in the UI when defined.
 - `MOODLE_CFG_theme=boost` -> Forces the 'boost' theme.
 - `MOODLE_CFG_lang=de` -> Forces German language.
 - `MOODLE_CFG_smtphosts=smtp.example.com:587` -> Sets the SMTP server.
-- `MOODLE_CFG_smtpuser=user@example.com` -> Sets the SMTP username.
 
 ### Plugin Settings (`MOODLE_PLG_`)
 Use the format `MOODLE_PLG_pluginname__settingname`. These are also automatically locked in the UI.
 - `MOODLE_PLG_auth_ldap__host_url=ldaps://ldap.example.com` -> Forces the LDAP host.
-- `MOODLE_PLG_quiz__grademethod=1` -> Forces the quiz grading method.
 
 ## Background Workers
 
-The `cron` service handles both scheduled tasks and ad-hoc tasks. You can scale these via environment variables in your `docker-compose.yml`:
+The `cron` service handles both scheduled tasks and ad-hoc tasks. You can scale these via environment variables:
 
-- **`MOODLE_CRON_COUNT`** (Default: 1): Number of parallel `cron.php` instances to run per minute. These use `--keep-alive=60` to manage internal locking.
-- **`MOODLE_ADHOC_TASK_COUNT`** (Default: 0): Number of parallel `adhoc_task.php` instances to run per minute. These use `--keep-alive=59` for rapid task processing.
+- **`MOODLE_CRON_COUNT`** (Default: 1): Parallel `cron.php` instances.
+- **`MOODLE_ADHOC_TASK_COUNT`** (Default: 0): Parallel `adhoc_task.php` instances.
 
 ### Automating OAuth2 Issuers via CLI
-Because OAuth2 "Issuers" are database-driven, they cannot be fully configured in `config.php`. We provide an idempotent helper script to manage them via JSON:
+We provide an idempotent helper script to manage issuers via JSON:
 
 1.  **Prepare a JSON config** (see `scripts/oauth2-config.example.json`).
 2.  **Run the script** inside the container:
     ```bash
-    docker compose exec app php /var/www/html/scripts/manage_oauth2_issuer.php /path/to/your-config.json
+    docker compose exec app php /opt/moodle/scripts/manage_oauth2_issuer.php /path/to/your-config.json
     ```
 
-This script will:
-- Create the issuer if it doesn't exist (matched by name or baseurl).
-- Update attributes (Client ID, Secret, etc.) if it already exists.
-- Automatically synchronize endpoints via OIDC discovery.
-- Idempotently manage user field mappings.
-
 #### Automating via Environment Variables
-Alternatively, you can provide the same JSON configuration directly via environment variables. Any variable starting with `MOODLE_OAUTH2_CONFIG_` will be processed on boot:
+Alternatively, any variable starting with `MOODLE_OAUTH2_CONFIG_` will be processed on boot:
 
 ```yaml
-# docker-compose.yml example
 environment:
-  MOODLE_OAUTH2_CONFIG_JSON: '{"name":"MyIDP","baseurl":"https://idp.example.com","clientid":"id","clientsecret":"secret","enabled":1,"field_mappings":{"sub":"username","email":"email"}}'
+  MOODLE_OAUTH2_CONFIG_JSON: '{"name":"MyIDP",...}'
 ```
+
+## Advanced Customization
+
+### Stateless Code & Sync
+By default, the image is the "Source of Truth" for Moodle core. Every time the `app` container starts, it synchronizes its patched code from `/opt/moodle/code` to the shared `moodle_code` volume using `rsync --delete`.
+
+### Adding Persistent Plugins/Themes
+If you need to persist specific plugins or themes via volumes:
+1.  **Mount the volume** in `docker-compose.yml` (e.g., `- ./my_plugin:/var/www/html/mod/my_plugin`).
+2.  **Exclude it from sync** by adding it to the `MOODLE_DOCKER_SYNC_EXCLUDE` environment variable (e.g., `MOODLE_DOCKER_SYNC_EXCLUDE="mod/my_plugin theme/my_theme"`).
+
+**WARNING**: If you mount a volume but forget to add it to the exclude list, `rsync` will attempt to delete or overwrite the files inside that volume on every boot.
 
 ## CI/CD & Publishing
 
-This repository includes a GitHub Actions workflow to automatically build and publish the Moodle image to the **GitHub Container Registry (GHCR)**.
-
-### How to Publish
-1.  **Automated**: Every push to the `main` branch or a version tag (e.g., `v5.1.3`) triggers a build.
-2.  **Manual**: Go to the "Actions" tab in your GitHub repository and run the "Publish Moodle Image" workflow manually.
-
-### Using the Published Image
-To use the published image instead of building it locally, update your `docker-compose.yml`:
-
-```yaml
-services:
-  app:
-    image: ghcr.io/your-username/moodle-docker:latest
-    # remove the 'build:' section
-```
-
-#### Available Tags
-The image is published with the following tagging strategy:
-- **`latest`**: Points to the most recent Moodle version on the latest PHP (8.4).
-- **`lts`**: Points to the most recent Moodle version on the **LTS PHP** (8.2).
-- **`<MAJOR>`** (e.g., `501`): Points to the most recent Moodle version of that major on the **LTS PHP** (8.2).
-- **`<MAJOR>-php<VERSION>`** (e.g., `501-php8.3`): Points to a specific Moodle major on a specific PHP version (8.2, 8.3, or 8.4).
+### Available Tags
+- **`latest`**: Most recent Moodle on PHP 8.4.
+- **`lts`**: Most recent Moodle on PHP 8.2 (LTS).
+- **`<MAJOR>-php<VERSION>`**: Specific versions (e.g., `501-php8.3`).
 
 ## Getting Started
 
 1.  **Configure Environment**:
     ```bash
     cp .env.example .env
-    # Edit .env with your specific settings (URL, DB passwords, etc.)
+    # Edit .env with your specific settings
     ```
 
 2.  **Launch**:
@@ -102,31 +87,15 @@ The image is published with the following tagging strategy:
     docker-compose up -d --build
     ```
 
-3.  **Initial Access**:
-    Access your Moodle site at the URL specified in `MOODLE_URL`. The first boot will automatically run the installation.
-
-## ⚠️ Security Warning
-
-**CRITICAL**: The environment variables `MOODLE_ADMIN_USER`, `MOODLE_ADMIN_PASS`, and `MOODLE_ADMIN_EMAIL` are only used for the **initial installation**. Once the site is up and you have logged in, **remove these variables** from your `.env` file or CI/CD secrets to prevent accidental resets or credential exposure.
-
 ## Maintenance & Upgrades
 
 ### Updating Moodle
-To update to a new Moodle version:
-1.  Update `MOODLE_VERSION` in your `.env` file.
-2.  Set `MOODLE_AUTO_UPGRADE=true`.
-3.  Rebuild and restart:
-    ```bash
-    docker-compose up -d --build
-    ```
-4.  Once the upgrade is complete, set `MOODLE_AUTO_UPGRADE=false`.
-
-### Reverse Proxy Support
-If you are running behind a public-facing reverse proxy (e.g., Traefik, Nginx, Cloudflare):
-- Set `MOODLE_REVERSE_PROXY=true`.
-- If your proxy provides SSL, set `MOODLE_SSL_PROXY=true`.
+To update, simply change the image tag or `MOODLE_VERSION` and:
+```bash
+docker-compose up -d --build
+```
 
 ## Volumes
-- `moodle_code`: Persistent Moodle source code (shared between Caddy and PHP).
+- `moodle_code`: Shared Moodle source code volume (managed by app sync).
 - `moodle_data`: The `moodledata` directory for uploads and cache.
 - `db_data`: Persistent PostgreSQL data.
