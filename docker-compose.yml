@@ -10,19 +10,21 @@ services:
       - db_data:/var/lib/postgresql/data
 
   app:
-    build:
-      context: .
-      args:
-        PHP_VERSION: ${PHP_VERSION:-8.4}
-        MOODLE_VERSION: ${MOODLE_VERSION:-5.1.3}
-        MOODLE_MAJOR_VERSION: ${MOODLE_MAJOR_VERSION:-501}
+    image: ghcr.io/fablab-ka/moodle-docker:latest
+    # To build locally, comment 'image' and uncomment 'build'
+    # build:
+    #   context: .
+    #   args:
+    #     PHP_VERSION: ${PHP_VERSION:-8.4}
+    #     MOODLE_VERSION: ${MOODLE_VERSION:-5.1.3}
+    #     MOODLE_MAJOR_VERSION: ${MOODLE_MAJOR_VERSION:-501}
     restart: always
     environment:
       MOODLE_DB_TYPE: pgsql
       MOODLE_DB_HOST: db
       MOODLE_DB_NAME: ${MOODLE_DB_NAME:-moodle}
       MOODLE_DB_USER: ${MOODLE_DB_USER:-moodle}
-      MOODLE_DB_PASS: ${MOODLE_DB_PASS:-moodle}
+      MOODLE_DB_PASS: ${MOODLE_DB_PASS}
       MOODLE_DB_PORT: 5432
       MOODLE_URL: ${MOODLE_URL:-http://localhost}
       MOODLE_REVERSE_PROXY: ${MOODLE_REVERSE_PROXY:-false}
@@ -51,9 +53,9 @@ services:
       - db
 
   cron:
-    image: moodle-app # Will be built by 'app'
-    build:
-      context: .
+    image: ghcr.io/fablab-ka/moodle-docker:latest
+    # build:
+    #   context: .
     restart: always
     command: ["cron"]
     environment:

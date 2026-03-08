@@ -4,11 +4,11 @@ This is a professional-grade, multi-container Moodle deployment designed for eas
 
 ## Architecture: Server-Worker Pattern
 
-This setup uses a **shared custom image** for all services (`app`, `cron`, and `web`).
+This setup uses a **shared custom image** for the PHP-based services.
 
 - **`app`**: Runs PHP-FPM to serve Moodle requests.
-- **`cron`**: Executes the Moodle cron and ad-hoc task loop.
-- **`web`**: A Caddy server that serves static assets directly from the shared code volume and proxies PHP requests to `app`.
+- **`cron`**: Runs the same image but executes the Moodle cron and ad-hoc task loop.
+- **`web`**: A standard Caddy server that serves static assets from the shared code volume and proxies PHP requests to `app`.
 - **`db`**: A PostgreSQL database container.
 
 ### Key Features
@@ -16,6 +16,30 @@ This setup uses a **shared custom image** for all services (`app`, `cron`, and `
 - **Modular Entrypoint**: Uses `run-parts` to execute idempotent step scripts in `/docker-entrypoint.d/`.
 - **Patched Source**: Moodle core code is patched during the build process.
 - **Forced Settings**: Pre-configure any Moodle setting via `MOODLE_CFG_` or `MOODLE_PLG_` environment variables.
+
+## Getting Started
+
+1.  **Configure Environment**:
+    ```bash
+    cp .env.example .env
+    # Edit .env with your specific settings
+    ```
+
+2.  **Launch**:
+    ```bash
+    docker-compose up -d
+    ```
+
+3.  **Initial Access**:
+    Access your Moodle site at the URL specified in `MOODLE_URL`. The first boot will automatically run the installation.
+
+**Security Warning**: The environment variables `MOODLE_ADMIN_USER`, `MOODLE_ADMIN_PASS`, and `MOODLE_ADMIN_EMAIL` are only used for the **initial installation**. Once the site is up and you have logged in, remove these variables from your `.env` file or CI/CD secrets to prevent accidental resets or credential exposure.
+
+### Local Development (In-place Build)
+If you wish to build the image locally instead of pulling from GHCR, modify your `docker-compose.yml`:
+1.  Comment out the `image: ghcr.io/...` lines for `app` and `cron`.
+2.  Uncomment the `build:` blocks.
+3.  Run: `docker-compose up -d --build`
 
 ## Configuration Overrides & Locking
 
@@ -62,7 +86,7 @@ By default, the image is the "Source of Truth" for Moodle core. Every time the `
 
 ### Adding Persistent Plugins/Themes
 If you need to persist specific plugins or themes via volumes:
-1.  **Mount the volume** in `docker-compose.yml` (e.g., `- ./my_plugin:/var/www/html/mod/my_plugin`).
+1.  **Mount the volume** in `docker-compose.yml` (e.g., `- ./my_theme:/var/www/html/theme/my_theme`).
 2.  **Exclude it from sync** by adding it to the `MOODLE_DOCKER_SYNC_EXCLUDE` environment variable (e.g., `MOODLE_DOCKER_SYNC_EXCLUDE="mod/my_plugin theme/my_theme"`).
 
 **WARNING**: If you mount a volume but forget to add it to the exclude list, `rsync` will attempt to delete or overwrite the files inside that volume on every boot.
@@ -72,28 +96,18 @@ If you need to persist specific plugins or themes via volumes:
 ### Available Tags
 - **`latest`**: Most recent Moodle on PHP 8.4.
 - **`lts`**: Most recent Moodle on PHP 8.2 (LTS).
+- **`<MAJOR>`** (e.g., `501`): Most recent Moodle of that major on LTS PHP (8.2).
 - **`<MAJOR>-php<VERSION>`**: Specific versions (e.g., `501-php8.3`).
-
-## Getting Started
-
-1.  **Configure Environment**:
-    ```bash
-    cp .env.example .env
-    # Edit .env with your specific settings
-    ```
-
-2.  **Launch**:
-    ```bash
-    docker-compose up -d --build
-    ```
 
 ## Maintenance & Upgrades
 
 ### Updating Moodle
-To update, simply change the image tag or `MOODLE_VERSION` and:
-```bash
-docker-compose up -d --build
-```
+To update, simply change the image tag or `MOODLE_VERSION` and restart.
+
+### Reverse Proxy Support
+If you are running behind a public-facing reverse proxy (e.g., Traefik, Nginx, Cloudflare):
+- Set `MOODLE_REVERSE_PROXY=true`.
+- If your proxy provides SSL, set `MOODLE_SSL_PROXY=true`.
 
 ## Volumes
 - `moodle_code`: Shared Moodle source code volume (managed by app sync).
