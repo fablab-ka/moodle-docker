@@ -1,0 +1,63 @@
+<?php
+unset($CFG);
+global $CFG;
+$CFG = new stdClass();
+
+$CFG->dbtype    = getenv('MOODLE_DB_TYPE') ?: 'pgsql';
+$CFG->dblibrary = 'native';
+$CFG->dbhost    = getenv('MOODLE_DB_HOST') ?: 'db';
+$CFG->dbname    = getenv('MOODLE_DB_NAME') ?: 'moodle';
+$CFG->dbuser    = getenv('MOODLE_DB_USER') ?: 'moodle';
+$CFG->dbpass    = getenv('MOODLE_DB_PASS') ?: 'moodle';
+$CFG->prefix    = 'mdl_';
+$CFG->dboptions = array (
+  'dbpersist' => 0,
+  'dbport' => getenv('MOODLE_DB_PORT') ?: '5432',
+  'dbsocket' => '',
+);
+
+// Database-specific overrides
+if ($CFG->dbtype === 'mysqli') {
+    $CFG->dboptions['dbcollation'] = 'utf8mb4_unicode_ci';
+    $CFG->dboptions['dbsetnames'] = true;
+}
+
+$CFG->wwwroot   = getenv('MOODLE_URL') ?: 'http://localhost';
+$CFG->dataroot  = '/var/www/moodledata';
+$CFG->dirroot   = '/var/www/html';
+$CFG->admin     = 'admin';
+
+$CFG->routerconfigured = true;
+
+$CFG->directorypermissions = 0777;
+
+// Proxy Settings
+if (getenv('MOODLE_REVERSE_PROXY') === 'true') {
+    $CFG->reverseproxy = true;
+}
+if (getenv('MOODLE_SSL_PROXY') === 'true') {
+    $CFG->sslproxy = true;
+}
+
+// Forced Core Settings (MOODLE_CFG_ prefix)
+foreach ($_ENV as $key => $value) {
+    if (strpos($key, 'MOODLE_CFG_') === 0) {
+        $cfg_name = strtolower(substr($key, 11));
+        $CFG->$cfg_name = $value;
+    }
+}
+
+// Forced Plugin Settings (MOODLE_PLG_ prefix)
+foreach ($_ENV as $key => $value) {
+    if (strpos($key, 'MOODLE_PLG_') === 0) {
+        $parts = explode('__', substr($key, 11));
+        if (count($parts) === 2) {
+            $plugin = strtolower($parts[0]);
+            $setting = strtolower($parts[1]);
+            $CFG->forced_plugin_settings[$plugin][$setting] = $value;
+            $CFG->forced_plugin_settings[$plugin][$setting . '_locked'] = true;
+        }
+    }
+}
+
+require_once(__DIR__ . '/lib/setup.php');

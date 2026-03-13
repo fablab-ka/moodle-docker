@@ -12,7 +12,9 @@ This setup uses a **shared custom image** for the PHP-based services.
 - **`db`**: A PostgreSQL database container.
 
 ### Key Features
-- **Stateless Configuration**: `config.php` is generated dynamically from environment variables on boot.
+- **Stateless Architecture**: The `/var/www/html` directory is ephemeral and wiped on every container restart, ensuring a "clean slate" and preventing configuration drift.
+- **Declarative Plugin Management**: Define plugins in your environment variables via `MOODLE_PLUGINS`, and they are automatically installed on boot using **Moosh**.
+- **Stateless Configuration**: `config.php` is baked into the image and reads all settings from environment variables.
 - **Modular Entrypoint**: Uses `run-parts` to execute idempotent step scripts in `/docker-entrypoint.d/`.
 - **Patched Source**: Moodle core code is patched during the build process.
 - **Forced Settings**: Pre-configure any Moodle setting via `MOODLE_CFG_` or `MOODLE_PLG_` environment variables.
@@ -82,14 +84,28 @@ environment:
 ## Advanced Customization
 
 ### Stateless Code & Sync
-By default, the image is the "Source of Truth" for Moodle core. Every time the `app` container starts, it synchronizes its patched code from `/opt/moodle/code` to the shared `moodle_code` volume using `rsync --delete`.
+In this architecture, the container's `/opt/moodle/code` directory is the **Source of Truth**. Every time the `app` (Leader) container starts, it:
+1.  **Restores** the patched core code from the image to the shared volume (using `rsync --delete`).
+2.  **Performs** Moodle installation or upgrades (Scripts 20-40).
+3.  **Installs** any plugins defined in `MOODLE_PLUGINS` (Script 50).
+4.  **Signals Readiness** via a `.ready` file (Script 99).
 
-### Adding Persistent Plugins/Themes
-If you need to persist specific plugins or themes via volumes:
-1.  **Mount the volume** in `docker-compose.yml` (e.g., `- ./my_theme:/var/www/html/theme/my_theme`).
-2.  **Exclude it from sync** by adding it to the `MOODLE_DOCKER_SYNC_EXCLUDE` environment variable (e.g., `MOODLE_DOCKER_SYNC_EXCLUDE="mod/my_plugin theme/my_theme"`).
+Follower services (`cron`, `web`) will wait for this `.ready` signal before starting their main processes. This ensures they only run when the codebase is fully synchronized and plugins are installed.
 
-**WARNING**: If you mount a volume but forget to add it to the exclude list, `rsync` will attempt to delete or overwrite the files inside that volume on every boot.
+### Declarative Plugin Management
+Instead of manually uploading plugins, define them in your `docker-compose.yml`:
+
+```yaml
+environment:
+  MOODLE_PLUGINS: "theme_moove mod_checklist https://github.com/example/plugin/archive/master.zip"
+  MOODLE_AUTO_UPGRADE: "true"
+```
+
+Plugins can be specified by their Moodle directory name (e.g., `theme_moove`) or by a direct download URL. The entrypoint uses **Moosh** to download and install them automatically.
+
+**Note**: It is highly recommended to set `MOODLE_AUTO_UPGRADE=true` when using `MOODLE_PLUGINS` to ensure that any database migrations required by the new plugins are executed automatically on boot.
+
+**WARNING**: Any files manually added to `/var/www/html` (e.g., via the Moodle UI or manual upload) **will be deleted** on the next container restart. Always use `MOODLE_PLUGINS` for persistent plugin management.
 
 ## CI/CD & Publishing
 

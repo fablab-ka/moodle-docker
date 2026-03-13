@@ -1,13 +1,13 @@
 services:
   db:
-    image: postgres:17-alpine
+    image: postgres:18-alpine
     restart: always
     environment:
       POSTGRES_DB: ${MOODLE_DB_NAME:-moodle}
       POSTGRES_USER: ${MOODLE_DB_USER:-moodle}
       POSTGRES_PASSWORD: ${MOODLE_DB_PASS:-moodle}
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql
 
   app:
     image: ghcr.io/fablab-ka/moodle-docker:latest
@@ -35,6 +35,7 @@ services:
       MOODLE_ADMIN_EMAIL: ${MOODLE_ADMIN_EMAIL}
       MOODLE_SITE_FULLNAME: ${MOODLE_SITE_FULLNAME:-Moodle Site}
       MOODLE_SITE_SHORTNAME: ${MOODLE_SITE_SHORTNAME:-Moodle}
+      MOODLE_PLUGINS: "${MOODLE_PLUGINS:-theme_moove format_remuiformat mod_checklist}"
       # Email Configuration (SMTP)
       MOODLE_CFG_smtphosts: ${MOODLE_SMTP_HOSTS:-}
       MOODLE_CFG_smtpsecure: ${MOODLE_SMTP_SECURE:-tls}
@@ -80,6 +81,7 @@ services:
     restart: always
     ports:
       - "8080:80"
+    entrypoint: ["sh", "-c", "while [ ! -f /var/www/html/.ready ]; do echo 'Waiting for .ready...'; sleep 2; done; caddy run --config /etc/caddy/Caddyfile --adapter caddyfile"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - moodle_code:/var/www/html
