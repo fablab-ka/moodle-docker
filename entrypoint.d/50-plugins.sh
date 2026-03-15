@@ -29,7 +29,7 @@ if [ "$IS_WORKER" = "false" ]; then
 
         # Refresh the plugin list (moosh handles age check)
         echo "Updating moosh plugin list..."
-        su -s /bin/bash -c "php -d memory_limit=512M /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-list" www-data
+        su -s /bin/bash -c "php -d memory_limit=512M /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-list" www-data > /dev/null
         
         # Patch local database with any known cached items
         $CACHE_MANAGER apply-cache

@@ -73,7 +73,6 @@ services:
     volumes:
       - moodle_code:/var/www/html
       - moodle_data:/var/www/moodledata
-      - moodle_cache:/var/www/moodlecache
     depends_on:
       - db
       - app
