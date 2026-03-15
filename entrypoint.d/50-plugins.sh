@@ -3,13 +3,14 @@ set -e
 
 CACHE_DIR="/var/www/moodlecache"
 MOOSH_DIR="/var/www/.moosh"
+CACHE_MANAGER="php /opt/moodle/scripts/plugin_cache_manager.php"
 
 if [ "$IS_WORKER" = "false" ]; then
     if [ -n "$MOODLE_PLUGINS" ]; then
         echo "Post-Installation: Processing plugins..."
         pushd /var/www/html/public > /dev/null
         
-        # Ensure config.php exists for moosh (required even for plugin-download -u)
+        # Ensure config.php exists for moosh
         if [ ! -f config.php ]; then
             echo "Restoring config.php for moosh..."
             cp /opt/moodle/code/config.php .
@@ -22,23 +23,19 @@ if [ "$IS_WORKER" = "false" ]; then
             chown www-data:www-data install.php
         fi
 
-        # --- Phase 1: Sync plugins.json ---
-        mkdir -p "$MOOSH_DIR"
-        chown www-data:www-data "$MOOSH_DIR"
+        # --- Phase 1: Sync and Refresh Database ---
+        # Load existing database from cache volume if available
+        $CACHE_MANAGER sync-to-moosh
 
-        if [ -f "$CACHE_DIR/plugins.json" ]; then
-            echo "Loading plugins.json from cache..."
-            cp "$CACHE_DIR/plugins.json" "$MOOSH_DIR/plugins.json"
-            chown www-data:www-data "$MOOSH_DIR/plugins.json"
-        fi
-
-        # Check if plugins.json is too old or missing (moosh will handle the download)
-        # We run plugin-list to ensure we have a fresh database
+        # Refresh the plugin list (moosh handles age check)
         echo "Updating moosh plugin list..."
         su -s /bin/bash -c "php -d memory_limit=512M /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-list" www-data
         
-        # Save fresh plugins.json back to cache
-        cp "$MOOSH_DIR/plugins.json" "$CACHE_DIR/plugins.json"
+        # Patch local database with any known cached items
+        $CACHE_MANAGER apply-cache
+        
+        # Persist the patched database back to cache volume
+        $CACHE_MANAGER sync-from-moosh
 
         # --- Phase 2: Caching Loop ---
         for plugin in $MOODLE_PLUGINS; do
@@ -50,7 +47,6 @@ if [ "$IS_WORKER" = "false" ]; then
             echo "Checking cache for $plugin..."
             
             # Resolve the correct download URL for this environment
-            # Note: moosh plugin-download -u returns just the URL string
             URL=$(su -s /bin/bash -c "php -d memory_limit=512M /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-download -u $plugin" www-data | grep "^http" | head -n 1)
             
             if [ -z "$URL" ]; then
@@ -58,51 +54,24 @@ if [ "$IS_WORKER" = "false" ]; then
                 continue
             fi
 
-            # Create a deterministic filename based on the URL
             URL_HASH=$(echo -n "$URL" | md5sum | cut -d' ' -f1)
             CACHE_FILE="$CACHE_DIR/$URL_HASH.zip"
 
             if [ ! -f "$CACHE_FILE" ]; then
                 echo "Cache miss for $plugin. Downloading..."
-                # Download to a temporary location first
                 su -s /bin/bash -c "php -d memory_limit=512M /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-download $plugin" www-data
                 
-                # Moosh downloads to current dir, usually named [plugin].zip
-                # But it's safer to find the most recent zip
+                # Find the downloaded zip
                 DOWNLOADED_ZIP=$(ls -t *.zip | head -n 1)
                 if [ -n "$DOWNLOADED_ZIP" ]; then
-                    mv "$DOWNLOADED_ZIP" "$CACHE_FILE"
-                    chown www-data:www-data "$CACHE_FILE"
-                    echo "Cached $plugin to $CACHE_FILE"
+                    # Move to cache volume using the manager (handles naming/hashing)
+                    $CACHE_MANAGER store-artifact "$DOWNLOADED_ZIP" "$URL"
+                    
+                    # Re-patch the JSON to reflect the new local file
+                    $CACHE_MANAGER apply-cache
                 fi
             else
                 echo "Cache hit for $plugin."
-            fi
-
-            # Patch plugins.json to point to the local file
-            # We use PHP to safely manipulate the JSON
-            if [ -f "$CACHE_FILE" ]; then
-                echo "Patching plugins.json for $plugin -> $CACHE_FILE"
-                php -r "
-                    \$json = json_decode(file_get_contents('$MOOSH_DIR/plugins.json'));
-                    \$targetUrl = '$URL';
-                    \$localPath = '$CACHE_FILE';
-                    \$found = false;
-                    foreach (\$json->plugins as \$p) {
-                        if (isset(\$p->versions)) {
-                            foreach (\$p->versions as \$v) {
-                                if (\$v->downloadurl === \$targetUrl) {
-                                    \$v->downloadurl = \$localPath;
-                                    \$found = true;
-                                    break 2;
-                                }
-                            }
-                        }
-                    }
-                    if (\$found) {
-                        file_put_contents('$MOOSH_DIR/plugins.json', json_encode(\$json));
-                    }
-                "
             fi
         done
 
@@ -116,7 +85,7 @@ if [ "$IS_WORKER" = "false" ]; then
                 rm "plugin_tmp.zip"
                 chown -R www-data:www-data .
             else
-                # Moosh will now find the local path in plugins.json
+                # Moosh will now find the local path in plugins.json for all cached items
                 su -s /bin/bash -c "php -d memory_limit=512M /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-install $plugin" www-data
             fi
         done

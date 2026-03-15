@@ -105,6 +105,16 @@ Plugins can be specified by their Moodle directory name (e.g., `theme_moove`) or
 
 **Note**: It is highly recommended to set `MOODLE_AUTO_UPGRADE=true` when using `MOODLE_PLUGINS` to ensure that any database migrations required by the new plugins are executed automatically on boot.
 
+#### Optional Download Cache
+To speed up container startups and reduce network load, you can mount a persistent volume for the plugin cache. This will store `plugins.json` and all downloaded ZIP artifacts.
+
+```yaml
+volumes:
+  - moodle_cache:/var/www/moodlecache
+```
+
+When enabled, the system will transparently reuse cached ZIP files, allowing Moosh to perform near-instant local installations.
+
 **WARNING**: Any files manually added to `/var/www/html` (e.g., via the Moodle UI or manual upload) **will be deleted** on the next container restart. Always use `MOODLE_PLUGINS` for persistent plugin management.
 
 ## CI/CD & Publishing
