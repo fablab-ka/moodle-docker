@@ -67,10 +67,10 @@ RUN mkdir -p /opt/moodle/code \
 # Bake Config
 COPY templates/config.php.stateless /opt/moodle/code/config.php
 
-# Create moodledata directory
-RUN mkdir -p /var/www/moodledata \
+# Create moodledata and moodlecache directories
+RUN mkdir -p /var/www/moodledata /var/www/moodlecache \
     && chown -R www-data:www-data /var/www \
-    && chmod -R 777 /var/www/moodledata
+    && chmod -R 777 /var/www/moodledata /var/www/moodlecache
 
 WORKDIR /var/www/html
 

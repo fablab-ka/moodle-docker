@@ -46,6 +46,7 @@ services:
     volumes:
       - moodle_code:/var/www/html
       - moodle_data:/var/www/moodledata
+      - moodle_cache:/var/www/moodlecache
       # DANGER: By default, the image syncs code to the volume and DELETES unknown files.
       # If you mount plugins/themes below, you MUST also add them to MOODLE_DOCKER_SYNC_EXCLUDE above.
       # - ./my_plugin:/var/www/html/mod/my_plugin
@@ -72,6 +73,7 @@ services:
     volumes:
       - moodle_code:/var/www/html
       - moodle_data:/var/www/moodledata
+      - moodle_cache:/var/www/moodlecache
     depends_on:
       - db
       - app
@@ -92,3 +94,4 @@ volumes:
   db_data:
   moodle_code:
   moodle_data:
+  moodle_cache:
