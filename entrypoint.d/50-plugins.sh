@@ -21,7 +21,7 @@ if [ "$IS_WORKER" = "false" ]; then
 
         # Download newest plugins.json for moosh
         echo "Updating moosh plugin list..."
-        su -s /bin/bash -c "php -d memory_limit=512M /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-list" www-data
+        su -s /bin/bash -c "php -d memory_limit=512M -d error_reporting='E_ALL & ~E_DEPRECATED & ~E_STRICT' -d display_errors=Off /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-list" www-data
 
         for plugin in $MOODLE_PLUGINS; do
             echo "Processing $plugin..."
@@ -35,9 +35,9 @@ if [ "$IS_WORKER" = "false" ]; then
             else
                 # Using moosh for Moodle.org plugins
                 # Run as www-data to avoid ownership/permission issues
-                # Increase memory limit for moosh
+                # Increase memory limit for moosh and suppress deprecations to avoid session issues
                 echo "Installing via moosh (as www-data)..."
-                su -s /bin/bash -c "php -d memory_limit=512M /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-install $plugin" www-data
+                su -s /bin/bash -c "php -d memory_limit=512M -d error_reporting='E_ALL & ~E_DEPRECATED & ~E_STRICT' -d display_errors=Off /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-install $plugin" www-data
             fi
         done
 
