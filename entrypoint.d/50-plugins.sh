@@ -4,19 +4,23 @@ set -e
 CACHE_DIR="/var/www/moodlecache"
 MOOSH_DIR="/var/www/.moosh"
 CACHE_MANAGER="php /opt/moodle/scripts/plugin_cache_manager.php"
+# Run moosh with increased memory limit,
+# suppress deprecations to avoid session issues,
+# and explicitly specify the moodle path.
+MOOSH_BIN="php -d memory_limit=512M -d error_reporting='E_ALL & ~E_DEPRECATED & ~E_STRICT' -d display_errors=Off /usr/local/bin/moosh --moodle-path=/var/www/html/public"
 
 if [ "$IS_WORKER" = "false" ]; then
     if [ -n "$MOODLE_PLUGINS" ]; then
         echo "Post-Installation: Processing plugins..."
         pushd /var/www/html/public > /dev/null
-        
+
         # Ensure config.php exists for moosh
         if [ ! -f config.php ]; then
             echo "Restoring config.php for moosh..."
             cp /opt/moodle/code/config.php .
             chown www-data:www-data config.php
         fi
-        
+
         # Ensure install.php exists for moosh
         if [ ! -f install.php ]; then
             touch install.php
@@ -29,11 +33,11 @@ if [ "$IS_WORKER" = "false" ]; then
 
         # Refresh the plugin list (moosh handles age check)
         echo "Updating moosh plugin list..."
-        su -s /bin/bash -c "php -d memory_limit=512M -d error_reporting='E_ALL & ~E_DEPRECATED & ~E_STRICT' -d display_errors=Off /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-list" www-data
-        
+        su -s /bin/bash -c "$MOOSH_BIN -n plugin-list" www-data
+
         # Patch local database with any known cached items
         $CACHE_MANAGER apply-cache
-        
+
         # Persist the patched database back to cache volume
         $CACHE_MANAGER sync-from-moosh
 
@@ -45,10 +49,10 @@ if [ "$IS_WORKER" = "false" ]; then
             fi
 
             echo "Checking cache for $plugin..."
-            
+
             # Resolve the correct download URL for this environment
-            URL=$(su -s /bin/bash -c "php -d memory_limit=512M -d error_reporting='E_ALL & ~E_DEPRECATED & ~E_STRICT' -d display_errors=off /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-download -u $plugin" www-data | grep "^http" | head -n 1)
-            
+            URL=$(su -s /bin/bash -c "$MOOSH_BIN -n plugin-download -u $plugin" www-data | grep "^http" | head -n 1)
+
             if [ -z "$URL" ]; then
                 echo "Could not resolve URL for $plugin, Moosh might handle it during install."
                 continue
@@ -59,7 +63,7 @@ if [ "$IS_WORKER" = "false" ]; then
 
             if [ ! -f "$CACHE_FILE" ]; then
                 echo "Cache miss for $plugin. Downloading..."
-                su -s /bin/bash -c "php -d memory_limit=512M -d error_reporting='E_ALL & ~E_DEPRECATED & ~E_STRICT' -d display_errors=Off /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-download $plugin" www-data
+                su -s /bin/bash -c "$MOOSH_BIN -n plugin-download $plugin" www-data
                 
                 # Find the downloaded zip
                 DOWNLOADED_ZIP=$(ls -t *.zip | head -n 1)
@@ -88,7 +92,7 @@ if [ "$IS_WORKER" = "false" ]; then
                 # Moosh will now find the local path in plugins.json for all cached items
                 # Increase memory limit for moosh and suppress deprecations to avoid session issues
                 echo "Installing via moosh (as www-data)..."
-                su -s /bin/bash -c "php -d memory_limit=512M -d error_reporting='E_ALL & ~E_DEPRECATED & ~E_STRICT' -d display_errors=Off /usr/local/bin/moosh --moodle-path=/var/www/html/public -n plugin-install $plugin" www-data
+                su -s /bin/bash -c "$MOOSH_BIN -n plugin-install $plugin" www-data
             fi
         done
         
