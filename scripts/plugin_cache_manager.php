@@ -99,6 +99,12 @@ function downloadFile($url, $path) {
     curl_setopt($ch, CURLOPT_HEADER, 0);
     curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
     curl_setopt($ch, CURLOPT_TIMEOUT, 300);
+    // Add Moosh-compatible headers to avoid faulty artifacts from Moodle.org
+    curl_setopt($ch, CURLOPT_HTTPHEADER, [
+        'User-Agent: moosh',
+        'Accept: application/json',
+        'Connection: close'
+    ]);
     $result = curl_exec($ch);
     curl_close($ch);
     fclose($fp);
