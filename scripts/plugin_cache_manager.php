@@ -48,42 +48,37 @@ switch ($command) {
         echo "  sync-to-moosh             Copy plugins.json from volume to moosh dir\n";
         echo "  sync-from-moosh           Copy plugins.json from moosh dir to volume\n";
         echo "  apply-cache               Patch plugins.json with local paths for all cached ZIPs\n";
-        echo "  store-artifact <input>    Download URL from input and patch plugins.json\n";
+        echo "  store-artifact <url>      Download URL from url and patch plugins.json\n";
         break;
 }
 
-function storeArtifact($input) {
+function storeArtifact($url) {
     global $CACHE_DIR;
-    
-    if (!$input) {
+
+    if (!$url) {
         echo "Usage: store-artifact <url_or_path>\n";
         exit(1);
     }
 
-    // 1. Detect if it's already a local cache path
-    if (strpos($input, $CACHE_DIR) !== false) {
-        echo "Already cached (via path detection): $input\n";
+    if (strpos($url, $CACHE_DIR) !== false) {
+        echo "Already cached (via path detection): $url\n";
         return;
     }
 
-    // 2. Extract URL from input (handling potential extra text from moosh)
-    if (preg_match('/(https?:\/\/[a-zA-Z0-9\.\/_-]+)/', $input, $matches)) {
-        $url = $matches[1];
-    } else {
-        echo "No valid URL or cache path found in input.\n";
-        return;
+    if (strpos($url, 'http') !== 0) {
+        echo "Input is not a valid URL or cache path: $url\n";
+        exit(1);
     }
 
     $hash = md5($url);
     $target = "$CACHE_DIR/$hash.zip";
 
-    // 3. Download if missing
     if (!file_exists($target)) {
         echo "Cache miss. Downloading artifact: $url\n";
         if (!is_dir($CACHE_DIR)) {
             mkdir($CACHE_DIR, 0755, true);
         }
-        
+
         if (!downloadFile($url, $target)) {
             echo "ERROR: Failed to download $url\n";
             exit(1);
@@ -94,7 +89,6 @@ function storeArtifact($input) {
         echo "Cache hit: $target\n";
     }
 
-    // 4. Always ensure the JSON is patched by calling the consolidated applyCache
     applyCache();
 }
 
@@ -113,7 +107,7 @@ function downloadFile($url, $path) {
 
 function applyCache() {
     global $CACHE_DIR, $MOOSH_JSON;
-    
+
     if (!file_exists($MOOSH_JSON)) {
         echo "No plugins.json found to patch.\n";
         return;
@@ -136,7 +130,7 @@ function applyCache() {
 
             $hash = md5($version->downloadurl);
             $local = "$CACHE_DIR/$hash.zip";
-            
+
             if (file_exists($local)) {
                 $version->downloadurl = $local;
                 $patched++;
