@@ -17,9 +17,23 @@ This setup uses a **shared custom image** for the PHP-based services.
 - **Stateless Configuration**: `config.php` is baked into the image and reads all settings from environment variables.
 - **Modular Entrypoint**: Uses `run-parts` to execute idempotent step scripts in `/docker-entrypoint.d/`.
 - **Patched Source**: Moodle core code is patched during the build process.
-- **Forced Settings**: Pre-configure any Moodle setting via `MOODLE_CFG_` or `MOODLE_PLG_` environment variables.
+- **Forced Settings**: Pre-configure any Moodle setting via `MOODLE_CFG_` or `MOODLE_PLG_` environment variables. String values "true" and "false" (case-insensitive) are automatically converted to their boolean equivalents.
 
 ## Getting Started
+...
+### Custom Configuration
+For complex configuration values (like arrays or objects) that cannot be easily passed via environment variables, you can provide a `config-custom.php` file. 
+
+1. Create a `config-custom.php` file in your project root.
+2. Mount it into the container in your `docker-compose.yml`:
+   ```yaml
+   services:
+     app:
+       volumes:
+         - ./config-custom.php:/var/www/html/config-custom.php
+   ```
+
+This file will be included by the main `config.php` before the final Moodle setup is executed.
 
 1.  **Configure Environment**:
     ```bash

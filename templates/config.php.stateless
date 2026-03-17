@@ -39,11 +39,22 @@ if (getenv('MOODLE_SSL_PROXY') === 'true') {
     $CFG->sslproxy = true;
 }
 
+// Helper to normalize environment values (e.g. handle string "false" as boolean false)
+$normalize_env = function($value) {
+    if (is_string($value) && strtolower($value) === 'false') {
+        return false;
+    }
+    if (is_string($value) && strtolower($value) === 'true') {
+        return true;
+    }
+    return $value;
+};
+
 // Forced Core Settings (MOODLE_CFG_ prefix)
 foreach ($_ENV as $key => $value) {
     if (strpos($key, 'MOODLE_CFG_') === 0) {
         $cfg_name = strtolower(substr($key, 11));
-        $CFG->$cfg_name = $value;
+        $CFG->$cfg_name = $normalize_env($value);
     }
 }
 
@@ -54,10 +65,15 @@ foreach ($_ENV as $key => $value) {
         if (count($parts) === 2) {
             $plugin = strtolower($parts[0]);
             $setting = strtolower($parts[1]);
-            $CFG->forced_plugin_settings[$plugin][$setting] = $value;
+            $CFG->forced_plugin_settings[$plugin][$setting] = $normalize_env($value);
             $CFG->forced_plugin_settings[$plugin][$setting . '_locked'] = true;
         }
     }
+}
+
+// Allow external custom configuration for complex types (arrays, etc.)
+if (file_exists(__DIR__ . '/config-custom.php')) {
+    include(__DIR__ . '/config-custom.php');
 }
 
 require_once(__DIR__ . '/lib/setup.php');
