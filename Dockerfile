@@ -46,14 +46,15 @@ RUN install-php-extensions \
     ${ADDITIONAL_PHP_EXTENSIONS}
 
 # Install Moosh
+# TODO: replace with git+composer installation for better versioning
 RUN curl -fSL https://moodle.org/plugins/download.php/39220/moosh_moodle51_2025121901.zip -o moosh.zip \
     && unzip moosh.zip -d /opt \
     && chmod +x /opt/moosh/moosh.php \
     && ln -s /opt/moosh/moosh.php /usr/local/bin/moosh \
     && rm moosh.zip
 
-# Increase max_input_vars
-RUN echo "max_input_vars = 5000" >> /usr/local/etc/php/conf.d/docker-php-moodle.ini
+# Bake PHP settings required by moodle
+COPY templates/docker-php-moodle.ini /usr/local/etc/php/conf.d/docker-php-moodle.ini
 
 # Set Moodle Version and Download Source
 ARG MOODLE_VERSION
