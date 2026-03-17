@@ -41,8 +41,6 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     cli_error("Error: Invalid JSON: " . json_last_error_msg());
 }
 
-}
-
 // 2. Validate required fields
 $required = ['name', 'baseurl', 'clientid', 'clientsecret'];
 foreach ($required as $req) {
@@ -67,43 +65,37 @@ try {
     unset($issuerdata->field_mappings);
 
     if ($existing) {
-        echo "Updating existing issuer: " . $existing->get('name') . " (ID: " . $existing->get('id') . ")
-";
+        echo "Updating existing issuer: " . $existing->get('name') . " (ID: " . $existing->get('id') . ")";
         $issuerdata->id = $existing->get('id');
         $issuer = \core\oauth2\api::update_issuer($issuerdata);
     } else {
-        echo "Creating new issuer: " . $config['name'] . "
-";
+        echo "Creating new issuer: " . $config['name'];
         $issuer = \core\oauth2\api::create_issuer($issuerdata);
     }
 
     $issuerid = $issuer->get('id');
 
     // 4. Synchronize Endpoints (Discovery)
-    echo "Synchronizing endpoints via discovery...
-";
+    echo "Synchronizing endpoints via discovery...";
     try {
         \core\oauth2\api::discover_endpoints($issuer);
     } catch (Exception $e) {
-        echo "Warning: Discovery failed (this is normal if the provider doesn't support OIDC discovery): " . $e->getMessage() . "
-";
+        echo "Warning: Discovery failed (this is normal if the provider doesn't support OIDC discovery): " . $e->getMessage();
     }
 
     // 5. Manage Field Mappings (Idempotent)
     if (!empty($config['field_mappings'])) {
-        echo "Synchronizing field mappings...
-";
-        
+        echo "Synchronizing field mappings...";
+
         // Get existing mappings for this issuer
         $existing_mappings = \core\oauth2\api::get_user_field_mappings($issuer);
-        
+
         foreach ($config['field_mappings'] as $external => $internal) {
             $found = false;
             foreach ($existing_mappings as $em) {
                 if ($em->get('internalfield') === $internal) {
                     if ($em->get('externalfield') !== $external) {
-                        echo "Updating mapping for $internal: $external
-";
+                        echo "Updating mapping for {$internal}: {$external}";
                         $em->set('externalfield', $external);
                         $em->save();
                     }
@@ -111,10 +103,9 @@ try {
                     break;
                 }
             }
-            
+
             if (!$found) {
-                echo "Creating new mapping: $external -> $internal
-";
+                echo "Creating new mapping: {$external} -> {$internal}";
                 \core\oauth2\api::create_user_field_mapping((object)[
                     'issuerid' => $issuerid,
                     'externalfield' => $external,
@@ -124,8 +115,7 @@ try {
         }
     }
 
-    echo "Successfully managed OAuth2 Issuer: " . $issuer->get('name') . "
-";
+    echo "Successfully managed OAuth2 Issuer: " . $issuer->get('name');
 
 } catch (Exception $e) {
     cli_error("CRITICAL ERROR: " . $e->getMessage());
