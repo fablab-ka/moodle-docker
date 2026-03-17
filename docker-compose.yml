@@ -45,7 +45,7 @@ services:
     volumes:
       - moodle_code:/var/www/html
       - moodle_data:/var/www/moodledata
-      - moodle_cache:/var/www/moodlecache
+      - moodle_plugincache:/var/www/plugincache
       # - ./config-custom.php:/opt/moodle/config-custom.php
     depends_on:
       - db
@@ -93,11 +93,11 @@ volumes:
   db_data:
   moodle_code:
   moodle_data:
-  moodle_cache:
+  moodle_plugincache:
 
 configs:
   moodle_config.php:
     content: |
       <?php
-      \$CFG->site_is_public = false;
-      \$CFG->very_complicated_setting = array('key' => true, 'foo' => 'Hello World!');
+      $$CFG->site_is_public = false;
+      $$CFG->very_complicated_setting = array('key' => true, 'foo' => 'Hello World!');

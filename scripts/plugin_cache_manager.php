@@ -5,7 +5,7 @@
  * Handles synchronization, downloading, and transparent patching of Moosh's plugin database.
  */
 
-$CACHE_DIR = '/var/www/moodlecache';
+$CACHE_DIR = '/var/www/plugincache';
 $MOOSH_DIR = '/var/www/.moosh';
 $MOOSH_JSON = "$MOOSH_DIR/plugins.json";
 $CACHE_JSON = "$CACHE_DIR/plugins.json";

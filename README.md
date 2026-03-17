@@ -124,7 +124,7 @@ To speed up container startups and reduce network load, you can mount a persiste
 
 ```yaml
 volumes:
-  - moodle_cache:/var/www/moodlecache
+  - moodle_plugincache:/var/www/plugincache
 ```
 
 When enabled, the system will transparently reuse cached ZIP files, allowing Moosh to perform near-instant local installations.

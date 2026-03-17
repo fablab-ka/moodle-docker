@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-CACHE_DIR="/var/www/moodlecache"
+CACHE_DIR="/var/www/plugincache"
 MOOSH_DIR="/var/www/.moosh"
 # Run commands with increased memory limit and suppress deprecations
 CACHE_MANAGER="php -d memory_limit=512M /opt/moodle/scripts/plugin_cache_manager.php"
@@ -56,7 +56,7 @@ if [ "$IS_WORKER" = "false" ]; then
 
             # Resolve the correct download URL for this environment
             # Note: moosh output might contain other text, we need to extract
-            # either a URL (http...) or a local cache path (/var/www/moodlecache/...)
+            # either a URL (http...) or a local cache path (/var/www/plugincache/...)
             moosh_out=$(su -s /bin/bash -c "$MOOSH_BIN -n plugin-download -u $plugin" www-data 2>&1 || true)
             plugin_uri=$(grep -oE "(https?://|$CACHE_DIR/)[^[:space:]]+" <<< "$moosh_out" | head -n 1)
 
