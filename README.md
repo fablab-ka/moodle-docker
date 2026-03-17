@@ -30,7 +30,7 @@ For complex configuration values (like arrays or objects) that cannot be easily 
    services:
      app:
        volumes:
-         - ./config-custom.php:/var/www/html/config-custom.php
+         - ./config-custom.php:/opt/moodle/config-custom.php
    ```
 
 This file will be included by the main `config.php` before the final Moodle setup is executed.

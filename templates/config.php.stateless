@@ -72,8 +72,8 @@ foreach ($_ENV as $key => $value) {
 }
 
 // Allow external custom configuration for complex types (arrays, etc.)
-if (file_exists(__DIR__ . '/config-custom.php')) {
-    include(__DIR__ . '/config-custom.php');
+if (file_exists('/opt/moodle/config-custom.php')) {
+    include('/opt/moodle/config-custom.php');
 }
 
 require_once(__DIR__ . '/lib/setup.php');

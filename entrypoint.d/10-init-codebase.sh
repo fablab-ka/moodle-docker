@@ -5,7 +5,7 @@ READY_FLAG="/var/www/html/.ready"
 
 if [ "$IS_WORKER" = "false" ]; then
     echo "Stateless Mode: Initializing codebase..."
-    
+
     echo "Restoring core code from /opt/moodle/code/..."
     rsync -rlptD --delete "/opt/moodle/code/" /var/www/html/
 

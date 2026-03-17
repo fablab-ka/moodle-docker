@@ -42,16 +42,11 @@ services:
       MOODLE_CFG_smtpuser: ${MOODLE_SMTP_USER:-}
       MOODLE_CFG_smtppass: ${MOODLE_SMTP_PASS:-}
       MOODLE_CFG_noreplyaddress: ${MOODLE_NOREPLY_ADDRESS:-noreply@example.com}
-      # MOODLE_DOCKER_SYNC_EXCLUDE: "mod/my_plugin theme/my_theme"
     volumes:
       - moodle_code:/var/www/html
       - moodle_data:/var/www/moodledata
       - moodle_cache:/var/www/moodlecache
-      # - ./config-custom.php:/var/www/html/config-custom.php
-      # DANGER: By default, the image syncs code to the volume and DELETES unknown files.
-      # If you mount plugins/themes below, you MUST also add them to MOODLE_DOCKER_SYNC_EXCLUDE above.
-      # - ./my_plugin:/var/www/html/mod/my_plugin
-      # - ./my_theme:/var/www/html/theme/my_theme
+      # - ./config-custom.php:/opt/moodle/config-custom.php
     depends_on:
       - db
 
@@ -74,6 +69,10 @@ services:
     volumes:
       - moodle_code:/var/www/html
       - moodle_data:/var/www/moodledata
+      # - ./config-custom.php:/opt/moodle/config-custom.php
+    configs:
+      - source: moodle_config.php
+        target: /opt/moodle/config-custom.php
     depends_on:
       - db
       - app
@@ -95,3 +94,10 @@ volumes:
   moodle_code:
   moodle_data:
   moodle_cache:
+
+configs:
+  moodle_config.php:
+    content: |
+      <?php
+      \$CFG->site_is_public = false;
+      \$CFG->very_complicated_setting = array('key' => true, 'foo' => 'Hello World!');
