@@ -8,7 +8,7 @@ if [ "$IS_WORKER" = "false" ]; then
     # Looks for MOODLE_OAUTH2_CONFIG_JSON or MOODLE_OAUTH2_CONFIG_<NAME>
     # Variables ending in _FILE are assumed to be paths to json configurations
     # Use 'env' to get all variables and filter
-    for var in $(env | grep "^{$VAR_PREFIX}" | cut -d= -f1); do
+    for var in $(env | grep "^${VAR_PREFIX}" | cut -d= -f1); do
         CONFIG_VAL="${!var}"
         if [ -n "$CONFIG_VAL" ]; then
             issuer="${var:${#VAR_PREFIX}}"
