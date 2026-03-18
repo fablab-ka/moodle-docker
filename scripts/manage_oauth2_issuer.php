@@ -1,15 +1,15 @@
+#!/usr/bin/env php
 <?php
 /**
  * Idempotent Moodle OAuth2 Issuer Management Script
- * 
+ *
  * Usage: php manage_oauth2_issuer.php /path/to/config.json
  */
 
 define('CLI_SCRIPT', true);
-require(__DIR__ . '/../config.php');
+require('/var/www/html/config.php');
 require_once($CFG->libdir . '/clilib.php');
 
-// 1. Get arguments
 list($options, $unrecognized) = cli_get_params(
     ['help' => false],
     ['h' => 'help']
@@ -28,7 +28,6 @@ if (!empty($unrecognized)) {
     }
     $jsoncontent = file_get_contents($jsonfile);
 } else {
-    // Read from stdin
     $jsoncontent = file_get_contents('php://stdin');
 }
 
@@ -41,7 +40,6 @@ if (json_last_error() !== JSON_ERROR_NONE) {
     cli_error("Error: Invalid JSON: " . json_last_error_msg());
 }
 
-// 2. Validate required fields
 $required = ['name', 'baseurl', 'clientid', 'clientsecret'];
 foreach ($required as $req) {
     if (empty($config[$req])) {
@@ -50,7 +48,10 @@ foreach ($required as $req) {
 }
 
 try {
-    // 3. Find existing issuer by name or baseurl
+    // Start session and log in as cron user (modified admin)
+    \core\cron::setup_user();
+
+    // Find existing issuer by name or baseurl
     $issuers = \core\oauth2\api::get_all_issuers();
     $existing = null;
     foreach ($issuers as $iss) {
@@ -65,27 +66,28 @@ try {
     unset($issuerdata->field_mappings);
 
     if ($existing) {
-        echo "Updating existing issuer: " . $existing->get('name') . " (ID: " . $existing->get('id') . ")";
+        echo "Updating existing issuer: {$existing->get('name')} (ID: {$existing->get('id')})\n";
         $issuerdata->id = $existing->get('id');
         $issuer = \core\oauth2\api::update_issuer($issuerdata);
     } else {
-        echo "Creating new issuer: " . $config['name'];
+        echo "Creating new issuer: {$config['name']}... ";
         $issuer = \core\oauth2\api::create_issuer($issuerdata);
+        echo "ID: {$issuer->get('id')}\n";
     }
 
     $issuerid = $issuer->get('id');
 
-    // 4. Synchronize Endpoints (Discovery)
-    echo "Synchronizing endpoints via discovery...";
+    // Synchronize Endpoints (Discovery)
+    echo "Synchronizing endpoints via discovery...\n";
     try {
-        \core\oauth2\api::discover_endpoints($issuer);
+        \core\oauth2\discovery\openidconnect::discover_endpoints($issuer);
     } catch (Exception $e) {
-        echo "Warning: Discovery failed (this is normal if the provider doesn't support OIDC discovery): " . $e->getMessage();
+        echo "Warning: Discovery failed (this is normal if the provider doesn't support OIDC discovery): {$e->getMessage()}\n";
     }
 
-    // 5. Manage Field Mappings (Idempotent)
+    // Manage Field Mappings (Idempotent)
     if (!empty($config['field_mappings'])) {
-        echo "Synchronizing field mappings...";
+        echo "Synchronizing field mappings...\n";
 
         // Get existing mappings for this issuer
         $existing_mappings = \core\oauth2\api::get_user_field_mappings($issuer);
@@ -95,7 +97,7 @@ try {
             foreach ($existing_mappings as $em) {
                 if ($em->get('internalfield') === $internal) {
                     if ($em->get('externalfield') !== $external) {
-                        echo "Updating mapping for {$internal}: {$external}";
+                        echo "Updating mapping: {$internal} -> {$external} (was {$em->get('externalfield')})\n";
                         $em->set('externalfield', $external);
                         $em->save();
                     }
@@ -105,7 +107,7 @@ try {
             }
 
             if (!$found) {
-                echo "Creating new mapping: {$external} -> {$internal}";
+                echo "Creating mapping: {$external} -> {$internal}\n";
                 \core\oauth2\api::create_user_field_mapping((object)[
                     'issuerid' => $issuerid,
                     'externalfield' => $external,
@@ -115,8 +117,10 @@ try {
         }
     }
 
-    echo "Successfully managed OAuth2 Issuer: " . $issuer->get('name');
+    echo "Successfully managed OAuth2 Issuer: {$issuer->get('name')}\n";
 
 } catch (Exception $e) {
-    cli_error("CRITICAL ERROR: " . $e->getMessage());
+    cli_error("CRITICAL ERROR:\n{$e->getMessage()}\n");
+} finally {
+    \core\cron::reset_user_cache();
 }

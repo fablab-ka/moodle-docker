@@ -1,7 +1,8 @@
+#!/usr/bin/env php
 <?php
 /**
  * Moodle Plugin Cache Manager
- * 
+ *
  * Handles synchronization, downloading, and transparent patching of Moosh's plugin database.
  */
 
