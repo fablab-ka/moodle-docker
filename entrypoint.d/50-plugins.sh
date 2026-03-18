@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-set -x
 
 CACHE_DIR="/var/www/plugincache"
 MOOSH_DIR="/var/www/.moosh"
