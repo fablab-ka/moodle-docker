@@ -1,6 +1,7 @@
 ARG PHP_VERSION=8.4
 ARG MOODLE_VERSION=5.1.3
 ARG MOODLE_MAJOR_VERSION=501
+ARG MOOSH_GIT_REF=05d93188ac2562b12a739963c1c52d97ca16e70f
 ARG ADDITIONAL_APT_PACKAGES=""
 ARG ADDITIONAL_PHP_EXTENSIONS=""
 
@@ -25,12 +26,12 @@ RUN apt-get update && apt-get install -y \
     less \
     rsync \
     sudo \
-    ${ADDITIONAL_APT_PACKAGES} \
-    && rm -rf /var/lib/apt/lists/*
+    ${ADDITIONAL_APT_PACKAGES}
 
 # Install PHP extensions using mlocati/php-extension-installer
 COPY --from=mlocati/php-extension-installer /usr/bin/install-php-extensions /usr/local/bin/
 RUN install-php-extensions \
+    @composer \
     intl \
     gd \
     zip \
@@ -46,42 +47,49 @@ RUN install-php-extensions \
     redis \
     ${ADDITIONAL_PHP_EXTENSIONS}
 
-# Install Moosh
-# TODO: replace with git+composer installation for better versioning
-RUN curl -fSL https://moodle.org/plugins/download.php/39220/moosh_moodle51_2025121901.zip -o moosh.zip \
-    && unzip moosh.zip -d /opt \
-    && chmod +x /opt/moosh/moosh.php \
-    && ln -s /opt/moosh/moosh.php /usr/local/bin/moosh \
-    && rm moosh.zip
+RUN apt-get clean \
+    && apt-get distclean
 
-# Bake PHP settings required by moodle
+# Create moodle, moosh, moodledata and plugincache directories
+RUN mkdir -p /opt/moodle /opt/moosh /var/www/moodledata /var/www/plugincache \
+    && chown -R www-data:www-data /opt/moodle /opt/moosh /var/www \
+    && chmod -R 755 /opt/moodle /opt/moosh /var/www/moodledata /var/www/plugincache
+
+# Copy entrypoint, step scripts, helper scripts, templates and patches to /opt/moodle
+COPY docker-entrypoint.sh /usr/local/bin/
+COPY entrypoint.d/ /docker-entrypoint.d/
+COPY --chown=www-data:www-data scripts/ /opt/moodle/scripts/
+COPY --chown=www-data:www-data templates/ /opt/moodle/templates/
+COPY --chown=www-data:www-data patches/ /opt/moodle/patches/
+
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+             /docker-entrypoint.d/*.sh
+
+RUN ln -fs /opt/moosh/moosh.php /usr/local/bin/moosh
+
+# Bake Config and moodle specific PHP settings
+COPY --chown=www-data:www-data templates/config.php /opt/moodle/code/config.php
 COPY templates/docker-php-moodle.ini /usr/local/etc/php/conf.d/docker-php-moodle.ini
+
+# Change to www-data for correct file permissions
+USER www-data
+
+# Install Moosh
+RUN cd /opt/moosh \
+    && git clone --no-tags --no-checkout -- https://github.com/tmuras/moosh.git ./ \
+    && git checkout ${MOOSH_GIT_REF} \
+    && rm -r .git \
+    && composer -n --no-cache --no-dev -o install
 
 # Set Moodle Version and Download Source
 ARG MOODLE_VERSION
 ARG MOODLE_MAJOR_VERSION
 ENV MOODLE_VERSION=${MOODLE_VERSION}
 RUN mkdir -p /opt/moodle/code \
+    && cd /opt/moodle/code \
     && curl -fSL "https://download.moodle.org/download.php/direct/stable${MOODLE_MAJOR_VERSION}/moodle-${MOODLE_VERSION}.tgz" -o moodle.tgz \
-    && tar -xzf moodle.tgz --strip-components=1 -C /opt/moodle/code \
+    && tar -xzf moodle.tgz --no-same-owner --strip-components=1 -C /opt/moodle/code \
     && rm moodle.tgz
-
-# Bake Config
-COPY templates/config.php.stateless /opt/moodle/code/config.php
-
-# Create moodledata and pluginecache directories
-RUN mkdir -p /var/www/moodledata /var/www/plugincache \
-    && chown -R www-data:www-data /var/www \
-    && chmod -R 755 /var/www/moodledata /var/www/plugincache
-
-WORKDIR /var/www/html
-
-# Copy entrypoint, step scripts, helper scripts, templates and patches to /opt/moodle
-COPY docker-entrypoint.sh /usr/local/bin/
-COPY scripts/ /opt/moodle/scripts/
-COPY entrypoint.d/ /docker-entrypoint.d/
-COPY templates/ /opt/moodle/templates/
-COPY patches/ /opt/moodle/patches/
 
 # Apply patches to the source of truth
 RUN for p in /opt/moodle/patches/*.patch; do \
@@ -90,9 +98,10 @@ RUN for p in /opt/moodle/patches/*.patch; do \
         patch -p0 -d /opt/moodle/code < "$p"; \
     done
 
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
-    && chmod +x /docker-entrypoint.d/*.sh \
-    && chown -R www-data:www-data /opt/moodle
+# Change back to root
+USER root
+
+WORKDIR /var/www/html
 
 # Environment variables with defaults
 ENV MOODLE_DB_TYPE=pgsql \
