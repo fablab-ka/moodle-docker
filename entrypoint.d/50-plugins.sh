@@ -34,7 +34,7 @@ if [ "$IS_WORKER" = "false" ]; then
 
         # Refresh the plugin list (moosh handles age check)
         echo "Updating moosh plugin list..."
-        su -s /bin/bash -c "$MOOSH_BIN -n plugin-list" www-data > /dev/null
+        sudo -u www-data -- $MOOSH_BIN -n plugin-list > /dev/null
 
         # Patch local database with any known cached items
         $CACHE_MANAGER apply-cache
@@ -47,7 +47,7 @@ if [ "$IS_WORKER" = "false" ]; then
             if [[ $plugin == http* ]]; then
                 echo "Installing plugin: $plugin"
                 curl -fSL "$plugin" -o "plugin_tmp.zip"
-                su -s /bin/bash -c "unzip -o 'plugin_tmp.zip'" www-data
+                sudo -u www-data -- unzip -o "plugin_tmp.zip"
                 rm "plugin_tmp.zip"
                 continue
             fi
@@ -57,7 +57,7 @@ if [ "$IS_WORKER" = "false" ]; then
             # Resolve the correct download URL for this environment
             # Note: moosh output might contain other text, we need to extract
             # either a URL (http...) or a local cache path (/var/www/plugincache/...)
-            moosh_out=$(su -s /bin/bash -c "$MOOSH_BIN -n plugin-download -u $plugin" www-data 2>&1 || true)
+            moosh_out=$(sudo -u www-data -- $MOOSH_BIN -n plugin-download -u $plugin 2>&1 || true)
             plugin_uri=$(grep -oE "(https?://|$CACHE_DIR/)[^[:space:]]+" <<< "$moosh_out" | head -n 1)
 
             echo "${plugin_uri:-(unknown)}"
@@ -71,13 +71,15 @@ if [ "$IS_WORKER" = "false" ]; then
 
             echo "Installing $plugin..."
             # Moosh will now find the local path in plugins.json for all cached items
-            su -s /bin/bash -c "$MOOSH_BIN -n plugin-install $plugin" www-data
+            sudo -u www-data $MOOSH_BIN -n plugin-install "$plugin"
         done
 
         if [ -n "$MOODLE_PLUGINS" ]; then
             if [ "$MOODLE_AUTO_UPGRADE" = "true" ]; then
                 echo "Running final upgrade check for plugins..."
-                su -s /bin/bash -c "cd /var/www/html && php admin/cli/upgrade.php --non-interactive" www-data
+                pushd /var/www/html > /dev/null
+                sudo -u www-data -- php admin/cli/upgrade.php --non-interactive
+                popd > /dev/null
             else
                 echo "NOTICE: MOODLE_AUTO_UPGRADE is not true. A manual upgrade via the Moodle UI or CLI is recommended to ensure plugins are properly installed and migrations have run."
             fi

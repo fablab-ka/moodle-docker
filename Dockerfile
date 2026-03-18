@@ -24,6 +24,7 @@ RUN apt-get update && apt-get install -y \
     patch \
     less \
     rsync \
+    sudo \
     ${ADDITIONAL_APT_PACKAGES} \
     && rm -rf /var/lib/apt/lists/*
 
@@ -71,7 +72,7 @@ COPY templates/config.php.stateless /opt/moodle/code/config.php
 # Create moodledata and pluginecache directories
 RUN mkdir -p /var/www/moodledata /var/www/plugincache \
     && chown -R www-data:www-data /var/www \
-    && chmod -R 777 /var/www/moodledata /var/www/plugincache
+    && chmod -R 755 /var/www/moodledata /var/www/plugincache
 
 WORKDIR /var/www/html
 
@@ -91,7 +92,7 @@ RUN for p in /opt/moodle/patches/*.patch; do \
 
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     && chmod +x /docker-entrypoint.d/*.sh \
-    && chown -R www-data:www-data /opt/moodle /docker-entrypoint.d
+    && chown -R www-data:www-data /opt/moodle
 
 # Environment variables with defaults
 ENV MOODLE_DB_TYPE=pgsql \
