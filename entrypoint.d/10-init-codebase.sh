@@ -19,9 +19,9 @@ if [ "$IS_WORKER" = "false" ]; then
 else
     # Workers wait for the .ready flag
     echo "Worker mode: Waiting for codebase initialization to complete..."
-    TIMEOUT=120
+    TIMEOUT=30
     while [ ! -f "$READY_FLAG" ] && [ $TIMEOUT -gt 0 ]; do
-        sleep 2
+        sleep 10
         TIMEOUT=$((TIMEOUT - 1))
     done
     if [ ! -f "$READY_FLAG" ]; then

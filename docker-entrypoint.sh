@@ -23,8 +23,8 @@ case "$1" in
         ADHOC_COUNT=${MOODLE_ADHOC_TASK_COUNT:-0}
         echo "Starting worker loop ($CRON_COUNT cron, $ADHOC_COUNT adhoc)..."
         while true; do
-            for ((i=0; i<CRON_COUNT; i++)); do sudo -u www-data -- php /var/www/html/admin/cli/cron.php --keep-alive=59 & done
-            for ((i=0; i<ADHOC_COUNT; i++)); do sudo -u www-data -- php /var/www/html/admin/cli/adhoc_task.php --execute --keep-alive=59 & done
+            for ((i=0; i<CRON_COUNT; i++)); do sudo -EHu www-data -- php /var/www/html/admin/cli/cron.php --keep-alive=59 & done
+            for ((i=0; i<ADHOC_COUNT; i++)); do sudo -EHu www-data -- php /var/www/html/admin/cli/adhoc_task.php --execute --keep-alive=59 & done
             sleep 60
         done
         ;;

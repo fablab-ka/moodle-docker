@@ -20,7 +20,7 @@ if [ "$IS_WORKER" = "false" ]; then
                 echo "ERROR: Admin credentials missing."
                 exit 1
             fi
-            sudo -u www-data -- php admin/cli/install_database.php \
+            sudo -EHu www-data -- php admin/cli/install_database.php \
                 --adminuser="$MOODLE_ADMIN_USER" \
                 --adminpass="$MOODLE_ADMIN_PASS" \
                 --adminemail="$MOODLE_ADMIN_EMAIL" \
@@ -32,7 +32,7 @@ if [ "$IS_WORKER" = "false" ]; then
         echo "Moodle already installed."
         if [ "$MOODLE_AUTO_UPGRADE" = "true" ]; then
             echo "Starting automated upgrade..."
-            sudo -u www-data -- php /var/www/html/admin/cli/upgrade.php --non-interactive
+            sudo -EHu www-data -- php /var/www/html/admin/cli/upgrade.php --non-interactive
         fi
     fi
 else

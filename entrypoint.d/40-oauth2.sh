@@ -16,13 +16,13 @@ if [ "$IS_WORKER" = "false" ]; then
                 [ "$issuer" = "FILE" ] && issuer="" || issuer="${issuer:0:(-5)}"
 
                 echo "Configuring OAuth2 Issuer${issuer:+ }$issuer from ${CONFIG_VAL}..."
-                sudo -u www-data -- php "${MOODLE_DOCKER_ROOT}/scripts/manage_oauth2_issuer.php" "$CONFIG_VAL"
+                sudo -EHu www-data -- php "${MOODLE_DOCKER_ROOT}/scripts/manage_oauth2_issuer.php" "$CONFIG_VAL"
             else
                 [ "$issuer" = "JSON" ] && issuer=""
                 [ "${issuer:(-5)}" = "_JSON" ] && issuer="${issuer:0:(-5)}"
 
                 echo "Configuring OAuth2 Issuer${issuer:+ }$issuer from $var (via stdin)..."
-                sudo -u www-data -- php "${MOODLE_DOCKER_ROOT}/scripts/manage_oauth2_issuer.php" <<< "$CONFIG_VAL"
+                sudo -EHu www-data -- php "${MOODLE_DOCKER_ROOT}/scripts/manage_oauth2_issuer.php" <<< "$CONFIG_VAL"
             fi
         fi
     done
