@@ -24,7 +24,8 @@ if [ "$IS_WORKER" = "false" ]; then
                 echo "Configuring OAuth2 Issuer${issuer:+ }$issuer from $var (via stdin)..."
                 sudo -EHu www-data -- php "${MOODLE_DOCKER_ROOT}/scripts/manage_oauth2_issuer.php" <<< "$CONFIG_VAL"
             fi
+
+            unset $var
         fi
     done
-
 fi
