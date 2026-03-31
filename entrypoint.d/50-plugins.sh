@@ -74,14 +74,21 @@ if [ "$IS_WORKER" = "false" ]; then
             sudo -EHu www-data -- "${MOOSH_BIN[@]}" -n plugin-install "$plugin"
         done
 
-        if [ -n "$MOODLE_PLUGINS" ]; then
+        if [ "$MOODLE_PLUGINS_PURGE_MISSING" = "true" ]; then
+            echo "Purging missing plugins from database..."
+            pushd /var/www/html > /dev/null
+            sudo -EHu www-data -- php admin/cli/uninstall_plugins.php --purge-missing --run
+            popd > /dev/null
+        fi
+
+        if [ -n "$MOODLE_PLUGINS" ] || [ "$MOODLE_PLUGINS_PURGE_MISSING" = "true" ]; then
             if [ "$MOODLE_AUTO_UPGRADE" = "true" ]; then
                 echo "Running final upgrade check for plugins..."
                 pushd /var/www/html > /dev/null
                 sudo -EHu www-data -- php admin/cli/upgrade.php --non-interactive
                 popd > /dev/null
             else
-                echo "NOTICE: MOODLE_AUTO_UPGRADE is not true. A manual upgrade via the Moodle UI or CLI is recommended to ensure plugins are properly installed and migrations have run."
+                echo "NOTICE: MOODLE_AUTO_UPGRADE is not true. A manual upgrade via the Moodle UI or CLI is recommended to ensure plugins are properly (un-) installed and migrations have run."
             fi
         fi
 
