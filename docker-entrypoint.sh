@@ -10,10 +10,17 @@ if [[ "$1" == "cron" || "$1" == "worker" ]]; then
     export IS_WORKER=true
 fi
 
+INIT_TIME=$(date +%s%3N)
+
 # Runner for modular entrypoint scripts
 if [ -d "/docker-entrypoint.d" ]; then
     echo "Running entrypoint scripts in /docker-entrypoint.d/..."
     run-parts --verbose --exit-on-error --regex '.*\.sh$' /docker-entrypoint.d
+fi
+
+if [ "$IS_WORKER" = "false" ]; then
+    INIT_TIME=$(($(date +%s%3N) - $INIT_TIME))
+    echo "Init done (${INIT_TIME:0:(-3)}.${INIT_TIME:(-3)}s)"
 fi
 
 # Execution Phase
