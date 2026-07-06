@@ -11,7 +11,7 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   MOODLE_LATEST: 502
-  PHP_LATEST: 8.5
+  PHP_LATEST: 8.4
   PHP_STABLE: 8.3
 
 jobs:
