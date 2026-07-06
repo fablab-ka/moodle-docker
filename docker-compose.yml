@@ -16,8 +16,7 @@ services:
     #   context: .
     #   args:
     #     PHP_VERSION: ${PHP_VERSION:-8.4}
-    #     MOODLE_VERSION: ${MOODLE_VERSION:-5.1.3}
-    #     MOODLE_MAJOR_VERSION: ${MOODLE_MAJOR_VERSION:-501}
+    #     MOODLE_MAJOR: ${MOODLE_MAJOR_VERSION:-501}
     restart: always
     environment:
       MOODLE_DB_TYPE: pgsql
