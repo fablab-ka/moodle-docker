@@ -115,7 +115,7 @@ const createGitChecker = (key: string, tagsApiUrl: string, filter: string | ((ta
 
     try {
       const tagFilter = typeof filter === 'function'
-        ? filter : ((flt, tag) => new RegExp(flt).test(tag.name)).bind(null, filter);
+        ? filter : ((flt, tag) => new RegExp(flt).test(tag?.name)).bind(null, filter);
 
       const tags = await fetch(tagsApiUrl).then(r => r.json());
 
@@ -222,7 +222,7 @@ async function checkUpdates(state: State): Promise<State> {
           createGitChecker(
             MOODLE_UPSTREAM,
             `https://api.github.com/repos/${MOODLE_UPSTREAM}/tags`,
-            (tag, major) => new RegExp(`^v${major[0]}\\.${parseInt(major.slice(1))}\\.\\d+(?!-rc)`).test(tag?.name)
+            (tag, major) => new RegExp(`^v${major[0]}\\.${parseInt(major.slice(1))}\\.\\d+(?!-rc|-beta)`).test(tag?.name)
           ),
           createDockerChecker(
             PHP_UPSTREAM,
