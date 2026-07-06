@@ -24,7 +24,7 @@ interface State {
 }
 
 interface WorkflowConfig {
-  moodleMajor: string;
+  moodleMajors: string[];
   phpVersions: string[];
 }
 
@@ -58,11 +58,11 @@ async function fetchWorkflowConfig(): Promise<WorkflowConfig | null> {
     const url = `https://raw.githubusercontent.com/${GITHUB_REPO}/main/.github/workflows/publish.yml`;
     const yaml = await fetch(url).then(r => r.text());
 
-    const majorMatch = yaml.match(/MOODLE_MAJOR:\s*(\d+)/);
+    const majorMatch = yaml.match(/moodle_major:\s*\[([^\]]+)\]/);
     const phpMatch = yaml.match(/php_version:\s*\[([^\]]+)\]/);
 
     if (!majorMatch || !phpMatch) {
-      console.error("Required fields MOODLE_MAJOR and php_version missing:", yaml);
+      console.error("Required fields moodle_major and php_version missing:", yaml);
       throw new Error("Parse error");
     }
 
@@ -70,7 +70,11 @@ async function fetchWorkflowConfig(): Promise<WorkflowConfig | null> {
       .split(',')
       .map(v => v.trim().replace(/['"]/g, ''));
 
-    return { moodleMajor: majorMatch[1], phpVersions };
+    const moodleMajors = majorMatch[1]
+      .split(',')
+      .map(v => v.trim().replace(/['"]/g, ''));
+
+    return { moodleMajors , phpVersions };
   } catch (e) {
     console.error("Failed to fetch workflow config:", e);
     return null;
@@ -90,7 +94,7 @@ function syncState(state: State, config: WorkflowConfig) {
     versions.forEach(cV => cV in state[checker][upstream] || (state[checker][upstream][cV] = ""));
   };
 
-  syncForUpstream('git', MOODLE_UPSTREAM, [config.moodleMajor]);
+  syncForUpstream('git', MOODLE_UPSTREAM, config.moodleMajors);
   syncForUpstream('docker', PHP_UPSTREAM, config.phpVersions.map(v => `${v}-fpm`));
 }
 
