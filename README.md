@@ -78,7 +78,7 @@ The `cron` service handles both scheduled tasks and ad-hoc tasks. You can scale 
 - **`MOODLE_CRON_COUNT`** (Default: 1): Parallel `cron.php` instances.
 - **`MOODLE_ADHOC_TASK_COUNT`** (Default: 0): Parallel `adhoc_task.php` instances.
 
-### Automating OAuth2 Issuers via CLI
+## Automating OAuth2 Issuers via CLI
 We provide an idempotent helper script to manage issuers via JSON:
 
 1.  **Prepare a JSON config** (see `scripts/oauth2-config.example.json`).
@@ -151,4 +151,5 @@ If you are running behind a public-facing reverse proxy (e.g., Traefik, Nginx, C
 ## Volumes
 - `moodle_code`: Shared Moodle source code volume (managed by app sync).
 - `moodle_data`: The `moodledata` directory for uploads and cache.
+- `moodle_plugincache`: (optional) A cache directory for moodle plugins. The persistent plugin artifact cache speeds up startup, especially when multiple plugins are specified.Refactor
 - `db_data`: Persistent PostgreSQL data.
