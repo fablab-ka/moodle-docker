@@ -78,7 +78,7 @@ The `cron` service handles both scheduled tasks and ad-hoc tasks. You can scale 
 - **`MOODLE_CRON_COUNT`** (Default: 1): Parallel `cron.php` instances.
 - **`MOODLE_ADHOC_TASK_COUNT`** (Default: 0): Parallel `adhoc_task.php` instances.
 
-### Automating OAuth2 Issuers via CLI
+## Automating OAuth2 Issuers via CLI
 We provide an idempotent helper script to manage issuers via JSON:
 
 1.  **Prepare a JSON config** (see `scripts/oauth2-config.example.json`).
@@ -135,14 +135,13 @@ When enabled, the system will transparently reuse cached ZIP files, allowing Moo
 
 ### Available Tags
 - **`latest`**: Most recent Moodle on PHP 8.4.
-- **`lts`**: Most recent Moodle on PHP 8.2 (LTS).
-- **`<MAJOR>`** (e.g., `501`): Most recent Moodle of that major on LTS PHP (8.2).
+- **`<MAJOR>`** (e.g., `501`): Most recent Moodle of that major on moodle recommended PHP version.
 - **`<MAJOR>-php<VERSION>`**: Specific versions (e.g., `501-php8.3`).
 
 ## Maintenance & Upgrades
 
 ### Updating Moodle
-To update, simply change the image tag or `MOODLE_VERSION` and restart.
+To update, simply change the image tag or `MOODLE_MAJOR` and restart.
 
 ### Reverse Proxy Support
 If you are running behind a public-facing reverse proxy (e.g., Traefik, Nginx, Cloudflare):
@@ -152,4 +151,5 @@ If you are running behind a public-facing reverse proxy (e.g., Traefik, Nginx, C
 ## Volumes
 - `moodle_code`: Shared Moodle source code volume (managed by app sync).
 - `moodle_data`: The `moodledata` directory for uploads and cache.
+- `moodle_plugincache`: (optional) A cache directory for moodle plugins. The persistent plugin artifact cache speeds up startup, especially when multiple plugins are specified.Refactor
 - `db_data`: Persistent PostgreSQL data.
