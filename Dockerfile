@@ -1,7 +1,6 @@
 ARG PHP_VERSION=8.4
-ARG MOODLE_VERSION=5.1.3
-ARG MOODLE_MAJOR_VERSION=501
-ARG MOOSH_GIT_REF=05d93188ac2562b12a739963c1c52d97ca16e70f
+ARG MOODLE_MAJOR=502
+ARG MOOSH_GIT_REF=3f4d51bd67dd32b07e4b44298c19dc597d476c77
 ARG ADDITIONAL_APT_PACKAGES=""
 ARG ADDITIONAL_PHP_EXTENSIONS=""
 
@@ -87,7 +86,7 @@ ARG MOODLE_MAJOR_VERSION
 ENV MOODLE_VERSION=${MOODLE_VERSION}
 RUN mkdir -p /opt/moodle/code \
     && cd /opt/moodle/code \
-    && curl -fSL "https://download.moodle.org/download.php/direct/stable${MOODLE_MAJOR_VERSION}/moodle-${MOODLE_VERSION}.tgz" -o moodle.tgz \
+    && curl -fSL "https://packaging.moodle.org/stable${MOODLE_MAJOR}/moodle-latest-${MOODLE_MAJOR}.tgz" -o moodle.tgz \
     && tar -xzf moodle.tgz --no-same-owner --strip-components=1 -C /opt/moodle/code \
     && rm moodle.tgz
 
