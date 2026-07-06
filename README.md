@@ -135,14 +135,13 @@ When enabled, the system will transparently reuse cached ZIP files, allowing Moo
 
 ### Available Tags
 - **`latest`**: Most recent Moodle on PHP 8.4.
-- **`lts`**: Most recent Moodle on PHP 8.2 (LTS).
-- **`<MAJOR>`** (e.g., `501`): Most recent Moodle of that major on LTS PHP (8.2).
+- **`<MAJOR>`** (e.g., `501`): Most recent Moodle of that major on moodle recommended PHP version.
 - **`<MAJOR>-php<VERSION>`**: Specific versions (e.g., `501-php8.3`).
 
 ## Maintenance & Upgrades
 
 ### Updating Moodle
-To update, simply change the image tag or `MOODLE_VERSION` and restart.
+To update, simply change the image tag or `MOODLE_MAJOR` and restart.
 
 ### Reverse Proxy Support
 If you are running behind a public-facing reverse proxy (e.g., Traefik, Nginx, Cloudflare):
