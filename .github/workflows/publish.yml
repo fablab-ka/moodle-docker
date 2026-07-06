@@ -10,10 +10,9 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  MOODLE_VERSION: 5.1.3
-  MOODLE_MAJOR: 501
-  PHP_LTS: 8.2
-  PHP_LATEST: 8.4
+  MOODLE_LATEST: 502
+  PHP_LATEST: 8.5
+  PHP_STABLE: 8.3
 
 jobs:
   build-and-push:
@@ -21,7 +20,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        php_version: ['8.2', '8.3', '8.4']
+        php_version: ['8.3', '8.4']
+        moodle_major: ['501', '502']
 
     permissions:
       contents: read
@@ -66,23 +66,20 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
             # Primary versioned tag (e.g., 501-php8.4)
-            type=raw,value=${{ env.MOODLE_MAJOR }}-php${{ matrix.php_version }}
+            type=raw,value=${{ matrix.moodle_major }}-php${{ matrix.php_version }}
 
-            # Major version tag (e.g., 501) points to LTS PHP (8.2)
-            type=raw,value=${{ env.MOODLE_MAJOR }},enable=${{ matrix.php_version == env.PHP_LTS }}
+            # Major version tag (e.g., 501) points to "stable" PHP (8.3)
+            type=raw,value=${{ matrix.moodle_major }},enable=${{ matrix.php_version == env.PHP_STABLE }}
 
-            # 'lts' tag points to latest major (501) and LTS PHP (8.2)
-            type=raw,value=lts,enable=${{ matrix.php_version == env.PHP_LTS }}
-
-            # 'latest' tag points to latest major (501) and latest PHP (8.4)
+            # 'latest' tag points to latest major (501) and "latest" PHP (8.4)
             type=raw,value=latest,enable=${{ matrix.php_version == env.PHP_LATEST }}
           labels: |
-            org.opencontainers.image.version=${{ env.MOODLE_VERSION }}-php${{ matrix.php_version }}
-            org.opencontainers.image.description=Moodle ${{ env.MOODLE_VERSION }} on PHP ${{ matrix.php_version }} | Ref: ${{ github.ref_name }} (${{ steps.vars.outputs.sha_short }}) | Trigger: ${{ steps.cause.outputs.msg }} | Built: ${{ steps.vars.outputs.date }}
+            org.opencontainers.image.version=${{ matrix.moodle_major }}-php${{ matrix.php_version }}
+            org.opencontainers.image.description=Moodle ${{ matrix.moodle_major }} on PHP ${{ matrix.php_version }} | Ref: ${{ github.ref_name }} (${{ steps.vars.outputs.sha_short }}) | Trigger: ${{ steps.cause.outputs.msg }} | Built: ${{ steps.vars.outputs.date }}
             org.opencontainers.image.source=${{ github.event.repository.html_url }}
           annotations: |
-            org.opencontainers.image.version=${{ env.MOODLE_VERSION }}-php${{ matrix.php_version }}
-            org.opencontainers.image.description=Moodle ${{ env.MOODLE_VERSION }} on PHP ${{ matrix.php_version }} | Ref: ${{ github.ref_name }} (${{ steps.vars.outputs.sha_short }}) | Trigger: ${{ steps.cause.outputs.msg }} | Built: ${{ steps.vars.outputs.date }}
+            org.opencontainers.image.version=${{ matrix.moodle_major }}-php${{ matrix.php_version }}
+            org.opencontainers.image.description=Moodle ${{ matrix.moodle_major }} on PHP ${{ matrix.php_version }} | Ref: ${{ github.ref_name }} (${{ steps.vars.outputs.sha_short }}) | Trigger: ${{ steps.cause.outputs.msg }} | Built: ${{ steps.vars.outputs.date }}
             org.opencontainers.image.source=${{ github.event.repository.html_url }}
 
       - name: Build and push Docker image
@@ -97,9 +94,8 @@ jobs:
           provenance: false
           sbom: false
           # Use unique scope per PHP version to prevent matrix cache collisions
-          cache-from: type=gha,scope=php-${{ matrix.php_version }}
-          cache-to: type=gha,mode=max,scope=php-${{ matrix.php_version }}
+          cache-from: type=gha,scope=moodle-${{ matrix.moodle_major }}-php-${{ matrix.php_version }}
+          cache-to: type=gha,mode=max,scope=moodle-${{ matrix.moodle_major }}-php-${{ matrix.php_version }}
           build-args: |
             PHP_VERSION=${{ matrix.php_version }}
-            MOODLE_VERSION=${{ env.MOODLE_VERSION }}
-            MOODLE_MAJOR_VERSION=${{ env.MOODLE_MAJOR }}
+            MOODLE_MAJOR=${{ matrix.moodle_major }}
