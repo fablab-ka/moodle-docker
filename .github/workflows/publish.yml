@@ -68,11 +68,11 @@ jobs:
             # Primary versioned tag (e.g., 501-php8.4)
             type=raw,value=${{ matrix.moodle_major }}-php${{ matrix.php_version }}
 
-            # Major version tag (e.g., 501) points to "stable" PHP (8.3)
+            # Major version tag (e.g., 501) points to "stable" (i.e. recommended by moodle) PHP
             type=raw,value=${{ matrix.moodle_major }},enable=${{ matrix.php_version == env.PHP_STABLE }}
 
-            # 'latest' tag points to latest major (501) and "latest" PHP (8.4)
-            type=raw,value=latest,enable=${{ matrix.php_version == env.PHP_LATEST }}
+            # 'latest' tag points to latest major (501) and "latest" (latest release compatible with moodle) PHP
+            type=raw,value=latest,enable=${{ matrix.php_version == env.PHP_LATEST && matrix.moodle_major == env.MOODLE_LATEST }}
           labels: |
             org.opencontainers.image.version=${{ matrix.moodle_major }}-php${{ matrix.php_version }}
             org.opencontainers.image.description=Moodle ${{ matrix.moodle_major }} on PHP ${{ matrix.php_version }} | Ref: ${{ github.ref_name }} (${{ steps.vars.outputs.sha_short }}) | Trigger: ${{ steps.cause.outputs.msg }} | Built: ${{ steps.vars.outputs.date }}
